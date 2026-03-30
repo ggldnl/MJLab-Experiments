@@ -1,0 +1,100 @@
+{
+    "joint_name_to_metadata": {
+        "leg_1_coxa": {
+            "actuator_type": "motor",
+            "nn_id": 0,
+            "id": 0,
+            "kp": "40.0",
+            "kd": "2.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_1_femur": {
+            "actuator_type": "motor",
+            "nn_id": 1,
+            "id": 1,
+            "kp": "40.0",
+            "kd": "2.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_1_tibia": {
+            "actuator_type": "motor",
+            "nn_id": 2,
+            "id": 2,
+            "kp": "40.0",
+            "kd": "2.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_2_coxa": {
+            "actuator_type": "motor",
+            "nn_id": 3,
+            "id": 3,
+            "kp": "40.0",
+            "kd": "2.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_2_femur": {
+            "actuator_type": "motor",
+            "nn_id": 4,
+            "id": 4,
+            "kp": "40.0",
+            "kd": "2.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_2_tibia": {
+            "actuator_type": "motor",
+            "nn_id": 5,
+            "id": 5,
+            "kp": "40.0",
+            "kd": "2.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_3_coxa": {
+            "actuator_type": "motor",
+            "nn_id": 6,
+            "id": 6,
+            "kp": "40.0",
+            "kd": "4.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_3_femur": {
+            "actuator_type": "motor",
+            "nn_id": 7,
+            "id": 7,
+            "kp": "40.0",
+            "kd": "4.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_3_tibia": {
+            "actuator_type": "motor",
+            "nn_id": 8,
+            "id": 8,
+            "kp": "40.0",
+            "kd": "4.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_4_coxa": {
+            "actuator_type": "motor",
+            "nn_id": 9,
+            "id": 9,
+            "kp": "40.0",
+            "kd": "4.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_4_femur": {
+            "actuator_type": "motor",
+            "nn_id": 10,
+            "id": 10,
+            "kp": "40.0",
+            "kd": "4.0",
+            "soft_torque_limit": "10.0"
+        },
+        "leg_4_tibia": {
+            "actuator_type": "motor",
+            "nn_id": 11,
+            "id": 11,
+            "kp": "40.0",
+            "kd": "4.0",
+            "soft_torque_limit": "10.0"
+        }
+    }
+}

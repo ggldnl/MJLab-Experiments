@@ -1,0 +1,189 @@
+<mujoco model="URDF">
+  <default>
+    <default class="robot">
+      <default class="motor">
+        <joint armature="0.0005" frictionloss="0.05" damping="0.1" actuatorfrcrange="-0.2 0.2" />
+        <motor ctrlrange="-11.4592 11.4592" />
+      </default>
+      <default class="visual">
+        <geom material="visualgeom" contype="0" conaffinity="0" group="2" />
+      </default>
+      <default class="collision">
+        <geom material="collision_material" condim="3" contype="0" conaffinity="1" priority="1" group="1" solref="0.005 1" solimp="0.99 0.999 1e-05" friction="1 0.01 0.01" />
+      </default>
+    </default>
+    <default class="backlash">
+      <joint damping="0.01" frictionloss="0" armature="0.01" limited="true" range="-0.5 0.5" />
+    </default>
+    <default class="floor">
+      <geom contype="1" conaffinity="1" group="0" type="plane" size="0 0 0.05" material="groundplane" rgba="1 1 1 0.3" />
+    </default>
+  </default>
+
+  <compiler angle="degree" />
+
+  <asset>
+    <material name="default_material" rgba="0.7 0.7 0.7 1" />
+    <material name="collision_material" rgba="1.0 0.28 0.1 0.9" />
+    <mesh name="base.stl" file="meshes/base.stl" />
+    <mesh name="coxa.stl" file="meshes/coxa.stl" />
+    <mesh name="femur.stl" file="meshes/femur.stl" />
+    <mesh name="tibia.stl" file="meshes/tibia.stl" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2" />
+  </asset>
+
+  <worldbody>
+    <body name="base" pos="0.00000000 0.00000000 0.00300000" quat="1 0 0 0" childclass="robot">
+      <freejoint name="floating_base" />
+      <geom name="base_collision" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" type="mesh" mesh="base.stl" scale="0.001 0.001 0.001" class="collision" />
+      <geom name="base_visual" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" material="default_material" type="mesh" mesh="base.stl" scale="0.001 0.001 0.001" class="visual" />
+      <body name="leg_1_coxa" pos="-0.02249999588670991 -0.02250000396793932 -4.682672214428862e-09" quat="4.329780281177467e-17 0.7071067811865476 -0.7071067811865475 -4.329780281177466e-17">
+        <joint name="leg_1_coxa" type="hinge" ref="0.0" class="motor" axis="0.0 0.0 1.0" />
+        <joint name="leg_1_coxa_backlash" class="backlash" axis="0.0 0.0 1.0" />
+        <site name="leg_1_coxa_site" pos="0.0 0.0 0.0" quat="1 0 0 0" />
+        <inertial pos="0.00607954930077514 0.006079557382004551 -0.0006464304048130887" quat="1.0 0.0 0.0 0.0" mass="0.012320734531554899" diaginertia="5.722976919083223e-07 5.722976919083223e-07 5.637559421977018e-07" />
+        <geom name="leg_1_coxa_collision" pos="0.009899490968672344 0.009899499049901754 0.0029999953173277796" quat="0.27059805007309856 -0.2705980500730985 0.6532814824381882 -0.6532814824381883" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="collision" />
+        <geom name="leg_1_coxa_visual" pos="0.009899490968672344 0.009899499049901754 0.0029999953173277796" quat="0.27059805007309856 -0.2705980500730985 0.6532814824381882 -0.6532814824381883" material="default_material" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="visual" />
+        <body name="leg_1_femur" pos="0.012020810000000002 0.007778179999999999 -0.006999999999999999" quat="6.123233995736766e-17 1.0 1.658379334061149e-51 -2.7083389842945365e-35">
+          <joint name="leg_1_femur" type="hinge" ref="0.0" class="motor" axis="0.707107 0.707107 3.830170908335114e-35" />
+          <joint name="leg_1_femur_backlash" class="backlash" axis="0.707107 0.707107 3.830170908335114e-35" />
+          <site name="leg_1_femur_site" pos="0 0 0" quat="1 0 0 0" />
+          <inertial pos="0.016263457279522553 -0.012020813986513414 4.682672223310646e-09" quat="1.0 0.0 0.0 0.0" mass="0.022539225349601982" diaginertia="2.37833414559731e-06 2.3783341455973135e-06 4.396427974324623e-06" />
+          <geom name="leg_1_femur_collision" pos="0.004242641999351258 0.00424264198077716 4.682672221090201e-09" quat="0.6532814824381883 0.6532814824381882 -0.2705980500730985 -0.27059805007309845" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="collision" />
+          <geom name="leg_1_femur_visual" pos="0.004242641999351258 0.00424264198077716 4.682672221090201e-09" quat="0.6532814824381883 0.6532814824381882 -0.2705980500730985 -0.27059805007309845" material="default_material" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="visual" />
+          <body name="leg_1_tibia" pos="0.02828427 -0.028284270000000004 0.0" quat="1.0 7.703719777548942e-34 4.506582899748004e-34 -1.2325951644078307e-32">
+            <joint name="leg_1_tibia" type="hinge" ref="0.0" class="motor" axis="-0.7071070000000002 -0.707107 -4.84832862692823e-33" />
+            <joint name="leg_1_tibia_backlash" class="backlash" axis="-0.7071070000000002 -0.707107 -4.84832862692823e-33" />
+            <site name="leg_1_tibia_site" pos="0 0 0" quat="1 0 0 0" />
+            <inertial pos="0.008315675330372242 -0.012558313411601657 4.682672225531093e-09" quat="1.0 0.0 0.0 3.26310233541909e-66" mass="0.01570347323772935" diaginertia="1.2007761535377137e-06 1.2007761535377099e-06 2.225971776107234e-06" />
+            <geom name="leg_1_tibia_collision" pos="-0.004242638127425431 -0.004242640640923266 0.005000004682672223" quat="0.6532814824381883 -0.2705980500730985 0.6532814824381882 0.27059805007309845" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="collision" />
+            <geom name="leg_1_tibia_visual" pos="-0.004242638127425431 -0.004242640640923266 0.005000004682672223" quat="0.6532814824381883 -0.2705980500730985 0.6532814824381882 0.27059805007309845" material="default_material" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="visual" />
+          </body>
+        </body>
+      </body>
+      <body name="leg_2_coxa" pos="-0.02249999588670991 0.022499996032060682 -4.682672214428862e-09" quat="4.329780281177467e-17 0.7071067811865476 -0.7071067811865475 -4.329780281177466e-17">
+        <joint name="leg_2_coxa" type="hinge" ref="0.0" class="motor" axis="0.0 0.0 1.0" />
+        <joint name="leg_2_coxa_backlash" class="backlash" axis="0.0 0.0 1.0" />
+        <site name="leg_2_coxa_site" pos="0 0 0" quat="1 0 0 0" />
+        <inertial pos="-0.006642110481126933 0.0066421106264777045 -0.0006464304048130908" quat="1.0 0.0 0.0 0.0" mass="0.012320734531554899" diaginertia="5.722976919083291e-07 5.722976919083223e-07 5.637559421976882e-07" />
+        <geom name="leg_2_coxa_collision" pos="-0.010462052149024138 0.01046205229437491 0.002999995317327777" quat="0.6532814824381883 -0.6532814824381882 0.27059805007309845 -0.2705980500730985" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="collision" />
+        <geom name="leg_2_coxa_visual" pos="-0.010462052149024138 0.01046205229437491 0.002999995317327777" quat="0.6532814824381883 -0.6532814824381882 0.27059805007309845 -0.2705980500730985" material="default_material" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="visual" />
+        <body name="leg_2_femur" pos="-0.008340729999999992 0.01258337 -0.006999999999999999" quat="6.123233995736766e-17 1.0 -1.658379334061149e-51 2.7083389842945365e-35">
+          <joint name="leg_2_femur" type="hinge" ref="0.0" class="motor" axis="0.707107 -0.707107 -3.830170908335114e-35" />
+          <joint name="leg_2_femur_backlash" class="backlash" axis="0.707107 -0.707107 -3.830170908335114e-35" />
+          <site name="leg_2_femur_site" pos="0 0 0" quat="1 0 0 0" />
+          <inertial pos="-0.012020817085635809 -0.016263458605225125 4.682672225531093e-09" quat="1.0 0.0 0.0 0.0" mass="0.022539225349601982" diaginertia="2.3783341455973e-06 2.3783341455973508e-06 4.396427974324643e-06" />
+          <geom name="leg_2_femur_collision" pos="0.00424263888165477 -0.004242643325053823 4.682672221090201e-09" quat="0.2705980500730986 0.27059805007309845 -0.6532814824381882 -0.6532814824381883" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="collision" />
+          <geom name="leg_2_femur_visual" pos="0.00424263888165477 -0.004242643325053823 4.682672221090201e-09" quat="0.2705980500730986 0.27059805007309845 -0.6532814824381882 -0.6532814824381883" material="default_material" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="visual" />
+          <body name="leg_2_tibia" pos="-0.028284270000000014 -0.028284270000000004 0.0" quat="1.0 -3.0814879110195774e-33 7.576033748615087e-34 2.465190328815662e-32">
+            <joint name="leg_2_tibia" type="hinge" ref="0.0" class="motor" axis="-0.707107 0.707107 -1.631123776889653e-32" />
+            <joint name="leg_2_tibia_backlash" class="backlash" axis="-0.707107 0.707107 -1.631123776889653e-32" />
+            <site name="leg_2_tibia_site" pos="0 0 0" quat="1 0 0 0" />
+            <inertial pos="-0.012558316510724001 -0.008315676656074824 4.682672227751539e-09" quat="1.0 0.0 -0.0 -1.6926019455616871e-65" mass="0.01570347323772935" diaginertia="1.2007761535377107e-06 1.2007761535376828e-06 2.2259717761071883e-06" />
+            <geom name="leg_2_tibia_collision" pos="-3.0529263206346968e-09 -3.885396435698852e-09 -0.004999995317327773" quat="0.6532814824381883 -0.2705980500730985 -0.6532814824381882 -0.27059805007309845" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="collision" />
+            <geom name="leg_2_tibia_visual" pos="-3.0529263206346968e-09 -3.885396435698852e-09 -0.004999995317327773" quat="0.6532814824381883 -0.2705980500730985 -0.6532814824381882 -0.27059805007309845" material="default_material" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="visual" />
+          </body>
+        </body>
+      </body>
+      <body name="leg_3_coxa" pos="0.022500004113290083 0.022499996032060682 -4.682672214428862e-09" quat="4.329780281177467e-17 0.7071067811865476 -0.7071067811865475 -4.329780281177466e-17">
+        <joint name="leg_3_coxa" type="hinge" ref="0.0" class="motor" axis="0.0 0.0 1.0" />
+        <joint name="leg_3_coxa_backlash" class="backlash" axis="0.0 0.0 1.0" />
+        <site name="leg_3_coxa_site" pos="0 0 0" quat="1 0 0 0" />
+        <inertial pos="-0.0066421104811269505 -0.006642102399897496 -0.0006464304048131175" quat="1.0 0.0 0.0 0.0" mass="0.012320734531554899" diaginertia="5.722976919083494e-07 5.722976919083359e-07 5.637559421977289e-07" />
+        <geom name="leg_3_coxa_collision" pos="-0.010462052149024155 -0.0104620440677947 0.0029999953173277393" quat="0.653281482438189 -0.6532814824381875 -0.27059805007309873 0.27059805007309823" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="collision" />
+        <geom name="leg_3_coxa_visual" pos="-0.010462052149024155 -0.0104620440677947 0.0029999953173277393" quat="0.653281482438189 -0.6532814824381875 -0.27059805007309873 0.27059805007309823" material="default_material" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="visual" />
+        <body name="leg_3_femur" pos="-0.01258337 -0.008340720000000008 -0.006999999999999999" quat="6.123233995736766e-17 1.0 9.860761315262654e-32 -1.0581870790932345e-30">
+          <joint name="leg_3_femur" type="hinge" ref="0.0" class="motor" axis="-0.707107 -0.707107 -1.6254898759704362e-30" />
+          <joint name="leg_3_femur_backlash" class="backlash" axis="-0.707107 -0.707107 -1.6254898759704362e-30" />
+          <site name="leg_3_femur_site" pos="0 0 0" quat="1 0 0 0" />
+          <inertial pos="-0.016263458459874282 0.012020819004406373 4.682672249955999e-09" quat="1.0 0.0 -0.0 -4.7973568987702647e-91" mass="0.022539225349601982" diaginertia="2.3783341455972965e-06 2.378334145597405e-06 4.396427974324643e-06" />
+          <geom name="leg_3_femur_collision" pos="-0.004242643179702981 -0.004242636962884206 4.682672216649309e-09" quat="0.27059805007309806 0.2705980500730987 0.6532814824381876 0.653281482438189" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="collision" />
+          <geom name="leg_3_femur_visual" pos="-0.004242643179702981 -0.004242636962884206 4.682672216649309e-09" quat="0.27059805007309806 0.2705980500730987 0.6532814824381876 0.653281482438189" material="default_material" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="visual" />
+          <body name="leg_3_tibia" pos="-0.028284269999999997 0.028284269999999997 0.0" quat="1.0 -1.8699652340826956e-61 -1.1000205853689425e-31 1.9721522630525295e-31">
+            <joint name="leg_3_tibia" type="hinge" ref="0.0" class="motor" axis="0.707107 0.707107 1.876117590738102e-30" />
+            <joint name="leg_3_tibia_backlash" class="backlash" axis="0.707107 0.707107 1.876117590738102e-30" />
+            <site name="leg_3_tibia_site" pos="0 0 0" quat="1 0 0 0" />
+            <inertial pos="-0.008315676510724028 0.012558318429494708 4.682672309908042e-09" quat="1.0 0.0 -0.0 -2.3038468514506412e-61" mass="0.01570347323772935" diaginertia="1.200776153537737e-06 1.2007761535376828e-06 2.2259717761072967e-06" />
+            <geom name="leg_3_tibia_collision" pos="-3.740045642075529e-09 4.971697045164092e-09 -0.00499999531732771" quat="0.2705980500730987 -0.653281482438189 -0.2705980500730981 -0.6532814824381876" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="collision" />
+            <geom name="leg_3_tibia_visual" pos="-3.740045642075529e-09 4.971697045164092e-09 -0.00499999531732771" quat="0.2705980500730987 -0.653281482438189 -0.2705980500730981 -0.6532814824381876" material="default_material" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="visual" />
+          </body>
+        </body>
+      </body>
+      <body name="leg_4_coxa" pos="0.022500004113290083 -0.02250000396793932 -4.682672214428862e-09" quat="4.329780281177467e-17 0.7071067811865476 -0.7071067811865475 -4.329780281177466e-17">
+        <joint name="leg_4_coxa" type="hinge" ref="0.0" class="motor" axis="0.0 0.0 1.0" />
+        <joint name="leg_4_coxa_backlash" class="backlash" axis="0.0 0.0 1.0" />
+        <site name="leg_4_coxa_site" pos="0 0 0" quat="1 0 0 0" />
+        <inertial pos="0.0060795493007751444 -0.006079549155424377 -0.0006464304048130787" quat="1.0 0.0 0.0 0.0" mass="0.012320734531554899" diaginertia="5.722976919083223e-07 5.72297691908319e-07 5.637559421977018e-07" />
+        <geom name="leg_4_coxa_collision" pos="0.009899490968672358 -0.009899490823321581 0.0029999953173277883" quat="0.2705980500730985 -0.27059805007309856 -0.6532814824381883 0.6532814824381882" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="collision" />
+        <geom name="leg_4_coxa_visual" pos="0.009899490968672358 -0.009899490823321581 0.0029999953173277883" quat="0.2705980500730985 -0.27059805007309856 -0.6532814824381883 0.6532814824381882" material="default_material" type="mesh" mesh="coxa.stl" scale="0.001 0.001 0.001" class="visual" />
+        <body name="leg_4_femur" pos="0.007778170000000002 -0.012020810000000015 -0.006999999999999999" quat="6.123233995736766e-17 1.0 6.162975822039155e-33 1.1028385436798344e-33">
+          <joint name="leg_4_femur" type="hinge" ref="0.0" class="motor" axis="-0.707107 0.7071069999999999 -3.241300140912161e-33" />
+          <joint name="leg_4_femur_backlash" class="backlash" axis="-0.707107 0.7071069999999999 -3.241300140912161e-33" />
+          <site name="leg_4_femur_site" pos="0 0 0" quat="1 0 0 0" />
+          <inertial pos="0.012020815905284064 0.0162634571341718 4.682672212208417e-09" quat="1.0 0.0 0.0 6.231125626933816e-98" mass="0.022539225349601982" diaginertia="2.3783341455973508e-06 2.378334145597304e-06 4.396427974324752e-06" />
+          <geom name="leg_4_femur_collision" pos="-0.004242640062006538 0.0042426418540004816 4.68267220998797e-09" quat="0.6532814824381882 0.6532814824381883 0.2705980500730985 0.27059805007309856" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="collision" />
+          <geom name="leg_4_femur_visual" pos="-0.004242640062006538 0.0042426418540004816 4.68267220998797e-09" quat="0.6532814824381882 0.6532814824381883 0.2705980500730985 0.27059805007309856" material="default_material" type="mesh" mesh="femur.stl" scale="0.001 0.001 0.001" class="visual" />
+          <body name="leg_4_tibia" pos="0.02828427 0.028284270000000014 -2.220446049250313e-18" quat="1.0 3.081487911019579e-33 3.8362671485298624e-33 6.162975822039156e-33">
+            <joint name="leg_4_tibia" type="hinge" ref="0.0" class="motor" axis="0.707107 -0.7071070000000002 -1.0367299274946627e-32" />
+            <joint name="leg_4_tibia_backlash" class="backlash" axis="0.707107 -0.7071070000000002 -1.0367299274946627e-32" />
+            <site name="leg_4_tibia_site" pos="0 0 0" quat="1 0 0 0" />
+            <inertial pos="0.012558315330372372 0.00831567518502144 4.682672194444848e-09" quat="1.0 0.0 0.0 0.0" mass="0.01570347323772935" diaginertia="1.200776153537737e-06 1.2007761535377086e-06 2.2259717761072425e-06" />
+            <geom name="leg_4_tibia_collision" pos="1.8725746742109807e-09 2.41434303660526e-09 -0.004999995317327806" quat="0.27059805007309856 0.6532814824381883 -0.2705980500730985 0.6532814824381882" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="collision" />
+            <geom name="leg_4_tibia_visual" pos="1.8725746742109807e-09 2.41434303660526e-09 -0.004999995317327806" quat="0.27059805007309856 0.6532814824381883 -0.2705980500730985 0.6532814824381882" material="default_material" type="mesh" mesh="tibia.stl" scale="0.001 0.001 0.001" class="visual" />
+          </body>
+        </body>
+      </body>
+      <site name="base_site" pos="0 0 0" quat="1 0 0 0" />
+      <camera name="front_camera" mode="track" fovy="90.0" quat="4.329780281177467e-17 4.329780281177466e-17 0.7071067811865475 0.7071067811865476" pos="0.0 2.0 0.5" />
+      <camera name="side_camera" mode="track" fovy="90.0" quat="-0.5 -0.4999999999999999 0.5 0.5000000000000001" pos="-2.0 0.0 0.5" />
+    </body>
+    <geom name="floor" class="floor" size="0 0 0.05" />
+  </worldbody>
+
+  <actuator>
+    <motor name="leg_1_coxa_ctrl" joint="leg_1_coxa" class="motor" />
+    <motor name="leg_1_femur_ctrl" joint="leg_1_femur" class="motor" />
+    <motor name="leg_1_tibia_ctrl" joint="leg_1_tibia" class="motor" />
+    <motor name="leg_2_coxa_ctrl" joint="leg_2_coxa" class="motor" />
+    <motor name="leg_2_femur_ctrl" joint="leg_2_femur" class="motor" />
+    <motor name="leg_2_tibia_ctrl" joint="leg_2_tibia" class="motor" />
+    <motor name="leg_3_coxa_ctrl" joint="leg_3_coxa" class="motor" />
+    <motor name="leg_3_femur_ctrl" joint="leg_3_femur" class="motor" />
+    <motor name="leg_3_tibia_ctrl" joint="leg_3_tibia" class="motor" />
+    <motor name="leg_4_coxa_ctrl" joint="leg_4_coxa" class="motor" />
+    <motor name="leg_4_femur_ctrl" joint="leg_4_femur" class="motor" />
+    <motor name="leg_4_tibia_ctrl" joint="leg_4_tibia" class="motor" />
+  </actuator>
+
+  <contact>
+    <exclude body1="base" body2="leg_1_coxa" />
+    <exclude body1="leg_1_coxa" body2="leg_1_femur" />
+    <exclude body1="leg_1_femur" body2="leg_1_tibia" />
+    <exclude body1="base" body2="leg_2_coxa" />
+    <exclude body1="leg_2_coxa" body2="leg_2_femur" />
+    <exclude body1="leg_2_femur" body2="leg_2_tibia" />
+    <exclude body1="base" body2="leg_3_coxa" />
+    <exclude body1="leg_3_coxa" body2="leg_3_femur" />
+    <exclude body1="leg_3_femur" body2="leg_3_tibia" />
+    <exclude body1="base" body2="leg_4_coxa" />
+    <exclude body1="leg_4_coxa" body2="leg_4_femur" />
+    <exclude body1="leg_4_femur" body2="leg_4_tibia" />
+  </contact>
+
+  <sensor>
+    <framepos name="leg_1_coxa_site_pos" objtype="site" objname="leg_1_coxa_site" />
+    <framequat name="leg_1_coxa_site_quat" objtype="site" objname="leg_1_coxa_site" />
+    <framelinvel name="leg_1_coxa_site_linvel" objtype="site" objname="leg_1_coxa_site" />
+    <frameangvel name="leg_1_coxa_site_angvel" objtype="site" objname="leg_1_coxa_site" />
+    <velocimeter name="leg_1_coxa_site_vel" site="leg_1_coxa_site" />
+    <accelerometer name="base_acc" site="leg_1_coxa_site" noise="0.001" />
+    <gyro name="base_gyro" site="leg_1_coxa_site" noise="0.01" />
+    <magnetometer name="base_mag" site="leg_1_coxa_site" />
+    <framepos name="leg_1_coxa_site_pos" objtype="site" objname="leg_1_coxa_site" />
+    <framequat name="leg_1_coxa_site_quat" objtype="site" objname="leg_1_coxa_site" />
+    <framelinvel name="leg_1_coxa_site_linvel" objtype="site" objname="leg_1_coxa_site" />
+    <frameangvel name="leg_1_coxa_site_angvel" objtype="site" objname="leg_1_coxa_site" />
+    <velocimeter name="leg_1_coxa_site_vel" site="leg_1_coxa_site" />
+  </sensor>
+</mujoco>

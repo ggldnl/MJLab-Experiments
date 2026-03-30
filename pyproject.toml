@@ -1,0 +1,19 @@
+[project]
+name = "mjlab-quadruped"
+version = "0.1.0"
+description = "MJLab Quadruped Experiment"
+readme = "README.md"
+authors = [
+    { name = "Re-l", email = "danielgigliotti99.dg@gmail.com" }
+]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "mjlab>=1.2.0",
+]
+
+[project.entry-points."mjlab.tasks"]
+quadruped_velocity = "quadruped_velocity"
+
+[build-system]
+requires = ["uv_build>=0.10.12,<0.11.0"]
+build-backend = "uv_build"
