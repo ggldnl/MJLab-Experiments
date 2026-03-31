@@ -28,6 +28,14 @@ def crawler_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     cfg.scene.entities = {"robot": get_crawler_robot_cfg()}
 
+    # remove observations that depend on imu or other sensors that don't exist
+    if "imu" in cfg.observations["actor"].terms:
+        del cfg.observations["actor"].terms["imu"]
+    if "imu_lin_vel" in cfg.observations["actor"].terms:
+        del cfg.observations["actor"].terms["imu_lin_vel"]
+    if "height_scan" in cfg.observations["actor"].terms:
+        del cfg.observations["actor"].terms["height_scan"]
+
     # Set raycast sensor frame to base, if existing
     for sensor in cfg.scene.sensors or ():
         if sensor.name == "terrain_scan":

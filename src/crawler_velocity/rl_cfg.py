@@ -12,7 +12,6 @@ def crawler_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(
       hidden_dims=(512, 256, 128),
-      stochastic=True,
     ),
     critic=RslRlModelCfg(
       hidden_dims=(512, 256, 128),
