@@ -215,5 +215,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Mujoco Lab
+# Claude
+.claude
+
+# Mujoco
 MUJOCO_LOG.TXT
