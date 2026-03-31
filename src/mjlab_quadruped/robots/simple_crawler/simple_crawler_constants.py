@@ -1,4 +1,4 @@
-"""ANYbotics ANYmal C constants."""
+"""Simple Crawler constants."""
 
 from pathlib import Path
 
@@ -11,7 +11,7 @@ from mjlab.utils.spec_config import CollisionCfg
 # MJCF and assets
 
 _HERE = Path(__file__).parent
-SIMPLE_CRAWLER_XML: Path = _HERE / "assets" / "simple_crawler.xml"
+SIMPLE_CRAWLER_XML: Path = _HERE / "assets" / "simple_crawler.urdf"
 assert SIMPLE_CRAWLER_XML.exists()
 
 
@@ -53,28 +53,45 @@ SIMPLE_CRAWLER_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
 # TODO fix these
 
 INIT_STATE = EntityCfg.InitialStateCfg(
-  pos=(0.0, 0.0, 0.05),
+  pos=(0.0, 0.0, 0.08),
+  
+  # Same leg configuration copy-pasted
   joint_pos={
-    ".*HAA": 0.0,
-    "LF_HFE": 0.4,
-    "RF_HFE": 0.4,
-    "LH_HFE": -0.4,
-    "RH_HFE": -0.4,
-    "LF_KFE": -0.8,
-    "RF_KFE": -0.8,
-    "LH_KFE": 0.8,
-    "RH_KFE": 0.8,
+    ".*coxa": 0.0,
+    ".*femur": 0.0,
+    ".*tibia": 0.0
   },
+  
   joint_vel={".*": 0.0},
 )
 
+"""
+# Use this if the legs have a different configuration
+# e.g. mirrored about x/y planes
+joint_pos={
+  "leg_1_coxa": 0.0,
+  "leg_1_femur": -0.4,
+  "leg_1_tibia": 0.6,
+  "leg_2_coxa": 0.0,
+  "leg_2_femur": -0.4,
+  "leg_2_tibia": 0.6,
+  "leg_3_coxa": 0.0,
+  "leg_3_femur": -0.4,
+  "leg_3_tibia": 0.6,
+  "leg_4_coxa": 0.0,
+  "leg_4_femur": -0.4,
+  "leg_4_tibia": 0.6,
+}
+"""
+
 # Collision config
-# TODO fix these
 
-_foot_regex = r"^[LR][FH]_foot$"
+_foot_regex = r"^leg_[1-4]_tibia$"
 
-FULL_COLLISION = CollisionCfg(
-  geom_names_expr=(".*_collision", _foot_regex),
+# .*mesh matches all geometry (base, coxa, femur, tibia, ...)
+# _foot_regex gets the special soft contact for stability
+SIMPLE_CRAWLER_COLLISION = CollisionCfg(
+  geom_names_expr=(".*mesh", _foot_regex),
   condim=3,
   priority=1,
   friction=(0.6,),
@@ -97,7 +114,7 @@ def get_simple_crawler_robot_cfg() -> EntityCfg:
   """
   return EntityCfg(
     init_state=INIT_STATE,
-    collisions=(FULL_COLLISION,),
+    collisions=(SIMPLE_CRAWLER_COLLISION,),
     spec_fn=get_spec,
     articulation=SIMPLE_CRAWLER_ARTICULATION,
   )
