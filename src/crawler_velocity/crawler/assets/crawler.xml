@@ -12,11 +12,19 @@
         <body name="base" pos="-0.054909463967939325 0.08112311588670991 0.008962584682672215" euler="1.0408340855860816e-17 0.0 1.5707963267948966">
             <geom name="base_geom" type="mesh" mesh="base" pos="0 0 0" euler="0 0 0" />
             <inertial mass="0.23577787558266994" pos="5.2041704279304066e-20 0.0 0.005" fullinertia="6.065105499097358e-05 6.065105499097412e-05 0.00011737247872223647 0.0 5.903759120246965e-22 0.0" />
+            <sensor>
+                <accelerometer name="base_accel" />
+                <gyro name="base_gyro" />
+            </sensor>
             <site name="base_com" pos="0 0 0" size="0.003" rgba="1 0 0 1"/>
+
+            <!--
             <site name="base_plane_1" pos="0.0245 0.0245 0" size="0.003" rgba="0 1 0 1"/>
             <site name="base_plane_2" pos="0.0245 -0.0245 0" size="0.003" rgba="0 1 0 1"/>
             <site name="base_plane_3" pos="-0.0245 -0.0245 0" size="0.003" rgba="0 1 0 1"/>
             <site name="base_plane_4" pos="-0.0245 0.0245 0" size="0.003" rgba="0 1 0 1"/>
+            -->
+
             <body name="leg_1_coxa" pos="-0.032399494936611664 -0.032399494936611664 -0.0029999999999999927" euler="1.5707963267948966 0.7853981633974483 -0.0">
                 <joint name="base_leg_1_coxa" type="hinge" axis="-7.359808400080175e-18 -1.0 -7.359808400080175e-18" pos="0.013999589980845425 0.0030004153173277797 2.461305977216484e-07" />
                 <geom name="leg_1_coxa_geom" type="mesh" mesh="coxa" pos="0 0 0" euler="0 0 0" />
