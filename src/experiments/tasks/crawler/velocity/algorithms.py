@@ -1,4 +1,10 @@
-"""RL configuration for Crawler velocity task."""
+"""
+Defines the learning algorithm. Here we can set PPO hyperparameters
+(learning rate, clip range, GAE lambda, mini-batches, etc.) and the
+neural network architecture (hidden layers, activation functions).
+It's fully decoupled from the environment — we could swap in SAC
+or any other algorithm without touching anything else.
+"""
 
 from mjlab.rl import (
   RslRlModelCfg,
@@ -7,7 +13,7 @@ from mjlab.rl import (
 )
 
 
-def crawler_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+def crawler_ppo_cfg() -> RslRlOnPolicyRunnerCfg:
   """Create RL runner configuration for Crawler velocity task."""
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(

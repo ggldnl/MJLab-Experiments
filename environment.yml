@@ -6,3 +6,6 @@ dependencies:
   - pip
   - pip:
     - mjlab
+    - loguru
+    - tyro
+    - -e .

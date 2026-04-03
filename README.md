@@ -15,7 +15,7 @@ conda activate mjlab_crawler
 
 The basic workflow for using reinforcement learning to achieve motion control is:
 
-`Train` → `Play` → `Sim2Rea`
+`Train` → `Play` → `Sim2Real`
 
 - Train: The agent interacts with the MuJoCo simulation and optimizes policies through reward maximization.
 - Play: Replay trained policies to verify expected behavior.
@@ -25,23 +25,15 @@ The basic workflow for using reinforcement learning to achieve motion control is
 
 Visualize the robot:
 ```bash
-python src/crawler_velocity/crawler/config.py
+python crawler/config.py
 ```
 
 Start training:
 ```bash
-python src/train.py Mjlab-Velocity-Flat-Crawler --env.scene.num-envs 4096
+python scripts/train.py crawler_velocity --wandb.project crawler_velocity
 ```
 
 Observe the policy:
 ```bash
 python src/play.py Mjlab-Velocity-Flat-Crawler --checkpoint_file=logs/rsl_rl/g1_velocity/2026-xx-xx_xx-xx-xx/model_xx.pt
 ```
-
-## 📂 Registry
-
-
-
-## ⚠️ TODO
-
-- [ ] Add robot_constants path to registry
