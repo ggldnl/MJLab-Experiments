@@ -28,32 +28,10 @@ def crawler_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
     cfg.scene.entities = {"robot": get_crawler_robot_cfg()}
 
-    # get list of available sensor names (with and without entity prefix)
-    available_sensors = set()
-    if cfg.scene.sensors:
-        for sensor in cfg.scene.sensors:
-            available_sensors.add(sensor.name)
-            available_sensors.add(f"robot/{sensor.name}")
-
-    # remove observation terms that reference non-existent sensors
-    for obs_group_name in ["actor", "critic"]:
-        terms_to_remove = []
-        for term_name in list(cfg.observations[obs_group_name].terms.keys()):
-            term_cfg = cfg.observations[obs_group_name].terms[term_name]
-            # check if this term references a sensor
-            if hasattr(term_cfg, 'params') and isinstance(term_cfg.params, dict):
-                if 'sensor_name' in term_cfg.params:
-                    sensor_name = term_cfg.params['sensor_name']
-                    if sensor_name not in available_sensors:
-                        print(f"Removing {obs_group_name} observation '{term_name}': sensor '{sensor_name}' not found")
-                        terms_to_remove.append(term_name)
-
-        for term_name in terms_to_remove:
-            del cfg.observations[obs_group_name].terms[term_name]
-
     # Set raycast sensor frame to base, if existing
     for sensor in cfg.scene.sensors or ():
         if sensor.name == "terrain_scan":
+            print(f'Raycast sensor found: {sensor.name}')
             assert isinstance(sensor, RayCastSensorCfg)
             sensor.frame.name = "base"
 
@@ -181,8 +159,8 @@ def crawler_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.scene.sensors = tuple(
         s for s in (cfg.scene.sensors or ()) if s.name != "terrain_scan"
     )
-    del cfg.observations["actor"].terms["height_scan"]
-    del cfg.observations["critic"].terms["height_scan"]
+    if "height_scan" in cfg.observations["actor"].terms: del cfg.observations["actor"].terms["height_scan"]
+    if "height_scan" in cfg.observations["critic"].terms: del cfg.observations["critic"].terms["height_scan"]
 
     # Disable terrain curriculum.
     cfg.curriculum.pop("terrain_levels", None)

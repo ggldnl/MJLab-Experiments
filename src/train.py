@@ -30,7 +30,7 @@ class TrainConfig:
     video_length: int = 200
     video_interval: int = 2000
     enable_nan_guard: bool = False
-    gpu_ids: list[int] | Literal["all"] | None = field(default_factory=lambda: [0])
+    gpu_ids: list[int] | Literal["all"] | None = None
 
     @staticmethod
     def from_task(task_id: str) -> "TrainConfig":

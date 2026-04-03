@@ -23,15 +23,19 @@ The basic workflow for using reinforcement learning to achieve motion control is
 
 ## 🚀 Deploy
 
-TODO
-
+Visualize the robot:
 ```bash
-python scripts/train.py --robot <robot> --env <env> --policy <policy> --env.scene.num-envs=4096
-python mjlab_experiments/scripts/train.py crawler-velocity-tracking --env.scene.num-envs 4096
+python src/crawler_velocity/crawler/config.py
 ```
 
+Start training:
 ```bash
-python scripts/play.py --robot <robot> --env <env> --checkpoint_file=logs/rsl_rl/g1_velocity/2026-xx-xx_xx-xx-xx/model_xx.pt
+python src/train.py Mjlab-Velocity-Flat-Crawler --env.scene.num-envs 4096
+```
+
+Observe the policy:
+```bash
+python src/play.py Mjlab-Velocity-Flat-Crawler --checkpoint_file=logs/rsl_rl/g1_velocity/2026-xx-xx_xx-xx-xx/model_xx.pt
 ```
 
 ## 📂 Registry

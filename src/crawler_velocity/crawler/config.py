@@ -130,10 +130,5 @@ if __name__ == "__main__":
     from mjlab.entity.entity import Entity
 
     robot = Entity(get_crawler_robot_cfg())
-
-    # Useful for debugging geom/site names:
     model = robot.spec.compile()
-    print("Geom names:", [model.geom(i).name for i in range(model.ngeom)])
-    print("Site names:", [model.site(i).name for i in range(model.nsite)])
-
     viewer.launch(model)
