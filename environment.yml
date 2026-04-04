@@ -1,11 +1,14 @@
-name: mjlab_crawler
+name: mjlab-experiments
 channels:
+  - pytorch
+  - nvidia
   - conda-forge
+  - defaults
 dependencies:
   - python=3.11
   - pip
+  - wandb
+  - pytorch
+  - pytorch-cuda=13.0
   - pip:
-    - mjlab
-    - loguru
-    - tyro
     - -e .

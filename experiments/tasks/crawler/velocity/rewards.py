@@ -29,7 +29,7 @@ from mjlab.tasks.velocity.mdp import (
 from mjlab.envs import ManagerBasedRlEnv
 from mjlab.utils.lab_api.math import quat_apply_inverse
 
-from crawler.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_SITE_NAMES
+from experiments.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_SITE_NAMES
 
 
 def flat_orientation(
@@ -111,7 +111,7 @@ rewards = {
     weight=-2.0,
     params={
       "target_height": 0.1,
-      "height_sensor_name": "foot_height_scan",
+      "height_sensor_name": f"foot_height_scan_{CRAWLER_FOOT_SITE_NAMES[0]}",
       "command_name": "twist",
       "command_threshold": 0.05,
       "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
@@ -122,10 +122,11 @@ rewards = {
     weight=-0.25,
     params={
       "sensor_name": "feet_ground_contact",
-      "height_sensor_name": "foot_height_scan",
+      "height_sensor_name": f"foot_height_scan_{CRAWLER_FOOT_SITE_NAMES[0]}",
       "target_height": 0.1,
       "command_name": "twist",
       "command_threshold": 0.05,
+      "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
     },
   ),
   "foot_slip": RewardTermCfg(
@@ -162,12 +163,12 @@ rewards["pose"].params["std_standing"] = {
   ".*": 0.05
 }
 rewards["pose"].params["std_walking"] = {
-  r"(?i).*coxa.*": 0.15,   # tighter
-  r"(?i).*femur.*": 0.35,  # looser
-  r"(?i).*tibia.*": 0.4,   # largest variation
+  r"(?i).*_coxa$": 0.15,   # tighter
+  r"(?i).*_femur$": 0.35,  # looser
+  r"(?i).*_tibia$": 0.4,   # largest variation
 }
 rewards["pose"].params["std_running"] = {
-  r"(?i).*coxa.*": 0.25,
-  r"(?i).*femur.*": 0.6,
-  r"(?i).*tibia.*": 0.7,
+  r"(?i).*_coxa$": 0.25,
+  r"(?i).*_femur$": 0.6,
+  r"(?i).*_tibia$": 0.7,
 }

@@ -3,10 +3,13 @@ from mjlab.sensor import (
   ContactSensorCfg,
   GridPatternCfg,
   ObjRef,
-  RayCastSensorCfg
+  RayCastSensorCfg,
+  # RingPatternCfg,
+  # TerrainHeightSensorCfg,
 )
 
-from crawler.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_GEOM_NAMES, CRAWLER_FOOT_SITE_NAMES
+from .constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_GEOM_NAMES
+
 
 # Contact Sensor Configurations (for observation/reward)
 # These create MuJoCo contact sensors dynamically (NOT in XML)
@@ -20,10 +23,14 @@ FEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
     pattern=r"leg_[1-4]_tibia_geom",
     entity="robot",
   ),
-  secondary=ContactMatch(mode="body", pattern="terrain"),
+  secondary=ContactMatch(
+    mode="geom",
+    pattern=r"terrain",
+  ),
   fields=("found", "force"),
   reduce="netforce",
   num_slots=4,
+  history_length=1,
   track_air_time=True,
 )
 
@@ -39,7 +46,7 @@ NONFOOT_GROUND_CONTACT_SENSOR = ContactSensorCfg(
   fields=("found", "force"),
   reduce="none",
   num_slots=1,
-  history_length=4,
+  history_length=1,
 )
 
 # Self-collision sensor
@@ -72,21 +79,20 @@ FOOT_FOOT_CONTACT_SENSOR = ContactSensorCfg(
 )
 
 # Simulation only sensor
-FOOT_HEIGHT_SCAN = RayCastSensorCfg(
-    name="foot_height_scan",
-    frame=tuple(
-        ObjRef(type="site", name=s, entity="robot")
-        for s in CRAWLER_FOOT_SITE_NAMES
-    ),
-    pattern=GridPatternCfg(
-        size=(0.06, 0.06),
-        resolution=0.03,
-    ),
-    ray_alignment="yaw",
-    max_distance=1.0,
-    exclude_parent_body=True,
-    include_geom_groups=(0,),
+
+"""
+FOOT_HEIGHT_SCAN = TerrainHeightSensorCfg(
+  name="foot_height_scan",
+  frame=tuple(
+    ObjRef(type="site", name=s, entity="robot") for s in CRAWLER_FOOT_GEOM_NAMES
+  ),
+  pattern=RingPatternCfg.single_ring(radius=0.03, num_samples=6),
+  ray_alignment="yaw",
+  max_distance=1.0,
+  exclude_parent_body=True,
+  include_geom_groups=(0,),  # Terrain only.
 )
+"""
 
 TERRAIN_SCAN = RayCastSensorCfg(
   name="terrain_scan",

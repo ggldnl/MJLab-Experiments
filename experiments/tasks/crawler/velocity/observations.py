@@ -49,6 +49,7 @@ actor_terms = {
 }
 
 # Critic takes all the terms of the actor + observations from environment e.g. foot height, ...
+
 critic_terms = {
   **actor_terms,
   "base_lin_vel": ObservationTermCfg(
@@ -56,10 +57,14 @@ critic_terms = {
     params={"sensor_name": "robot/imu_lin_vel"},
     noise=Unoise(n_min=-0.5, n_max=0.5),
   ),
+
+  """
   "foot_height": ObservationTermCfg(
     func=foot_height,
     params={"sensor_name": "foot_height_scan"},
   ),
+  """
+  
   "foot_air_time": ObservationTermCfg(
     func=foot_air_time,
     params={"sensor_name": "feet_ground_contact"},

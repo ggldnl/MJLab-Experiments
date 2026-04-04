@@ -2,7 +2,6 @@
 Holds terrain configurations.
 """
 
-from mjlab.terrains.config import ALL_TERRAINS_CFG
 from mjlab.terrains.terrain_generator import TerrainGeneratorCfg
 from mjlab.terrains import TerrainEntityCfg
 from mjlab.terrains.config import ALL_TERRAINS_CFG
@@ -32,6 +31,7 @@ def simple_terrain_cfg() -> TerrainEntityCfg:
                 "flat": base_cfg,
             },
             difficulty_range=(0.0, 0.0),  # no variation
+            border_width=0.0,
         ),
     )
 

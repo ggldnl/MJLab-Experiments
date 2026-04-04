@@ -11,20 +11,20 @@ from mjlab.scene import SceneCfg
 from mjlab.sim import MujocoCfg, SimulationCfg
 from mjlab.viewer import ViewerConfig
 
-from crawler.robots.crawler.config import get_crawler_robot_cfg
-from crawler.robots.crawler.constants import CRAWLER_BASE_NAME
-from crawler.robots.crawler.sensors import (
+from experiments.robots.crawler.config import get_crawler_robot_cfg
+from experiments.robots.crawler.constants import CRAWLER_BASE_NAME
+from experiments.robots.crawler.sensors import (
   FEET_GROUND_CONTACT_SENSOR,
-  FOOT_HEIGHT_SCAN,
+  # FOOT_HEIGHT_SCAN,
   NONFOOT_GROUND_CONTACT_SENSOR,
   SELF_COLLISION_SENSOR,
 )
 
-from crawler.velocity.terrains import play_terrain_cfg, training_terrain_cfg
-from crawler.velocity.cact import actions, commands, curriculum, terminations
-from crawler.velocity.events import events
-from crawler.velocity.observations import observations
-from crawler.velocity.rewards import rewards
+from .terrains import play_terrain_cfg, training_terrain_cfg
+from .cact import actions, commands, curriculum, terminations
+from .events import events
+from .observations import observations
+from .rewards import rewards
 
 
 def scene_cfg(play: bool = False, num_envs: int = 2048) -> SceneCfg:
@@ -34,7 +34,7 @@ def scene_cfg(play: bool = False, num_envs: int = 2048) -> SceneCfg:
     entities={"robot": get_crawler_robot_cfg()},
     sensors=(
       FEET_GROUND_CONTACT_SENSOR,
-      FOOT_HEIGHT_SCAN,
+      # FOOT_HEIGHT_SCAN,
       NONFOOT_GROUND_CONTACT_SENSOR,
       SELF_COLLISION_SENSOR,
     ),

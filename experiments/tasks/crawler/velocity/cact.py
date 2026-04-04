@@ -26,7 +26,7 @@ from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.tasks.velocity.mdp.curriculums import commands_vel
 
-from crawler.robots.crawler.actuators import CRAWLER_ACTION_SCALES
+from experiments.robots.crawler.actuators import CRAWLER_ACTION_SCALES
 
 
 commands: Dict[str, CommandTermCfg] = {

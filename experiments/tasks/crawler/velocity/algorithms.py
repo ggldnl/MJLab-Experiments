@@ -14,13 +14,21 @@ from mjlab.rl import (
 
 
 def crawler_ppo_cfg() -> RslRlOnPolicyRunnerCfg:
-  """Create RL runner configuration for Crawler velocity task."""
   return RslRlOnPolicyRunnerCfg(
     actor=RslRlModelCfg(
       hidden_dims=(512, 256, 128),
+      activation="elu",
+      obs_normalization=True,
+      distribution_cfg={
+        "class_name": "GaussianDistribution",
+        "init_std": 1.0,
+        "std_type": "log",
+      },
     ),
     critic=RslRlModelCfg(
       hidden_dims=(512, 256, 128),
+      activation="elu",
+      obs_normalization=True,
     ),
     algorithm=RslRlPpoAlgorithmCfg(
       entropy_coef=0.01,

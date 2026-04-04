@@ -17,7 +17,7 @@ from mjlab.envs.mdp.events import (
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 
-from crawler.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_GEOM_NAMES
+from experiments.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_GEOM_NAMES
 
 
 events = {

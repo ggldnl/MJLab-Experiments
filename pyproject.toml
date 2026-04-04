@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mjlab-experiments"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "mujoco>=3.6.0",
+    "mjlab",
+    "tyro",
+    "wandb",
+    "loguru",
+    "gymnasium",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["experiments*"]
+
+[tool.setuptools.package-data]
+"experiments.robots.crawler" = ["assets/**/*"]

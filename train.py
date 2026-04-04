@@ -2,11 +2,16 @@
 Train an RL agent on a registered mjlab task.
 
 Usage:
-    python train.py my-robot-velocity
-    python train.py my-robot-velocity --wandb.project my-project --seed 42
-    python train.py my-robot-velocity --gpu-ids 0 1
-    python train.py my-robot-velocity --checkpoint logs/.../checkpoints/model_1000.pt
+    python train.py crawler-velocity
+    python train.py crawler-velocity --env.scene.num-envs 2048
+    python train.py crawler-velocity --env.episode-length-s 30
+    python train.py crawler-velocity --agent.learning-rate 3e-4
+    python train.py crawler-velocity --wandb.project my-project
+    python train.py crawler-velocity --checkpoint logs/.../checkpoints/model_1000.pt
+    python train.py crawler-velocity --gpu-ids 0 1
 """
+
+from __future__ import annotations
 
 import logging
 import os
@@ -16,41 +21,50 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
+import torch
 import tyro
 import wandb
 from loguru import logger
 
-from mjlab.envs import ManagerBasedRlEnv
-from mjlab.rl import MjlabOnPolicyRunner, RslRlVecEnvWrapper
+from mjlab.envs import ManagerBasedRlEnv, ManagerBasedRlEnvCfg
+from mjlab.rl import MjlabOnPolicyRunner, RslRlBaseRunnerCfg, RslRlVecEnvWrapper
 from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.utils.gpu import select_gpus
 from mjlab.utils.os import dump_yaml, get_checkpoint_path
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
 
-import crawler.tasks  # noqa: F401 - populates the task registry
+import experiments.tasks  # noqa: F401 - triggers _auto_import_submodules, populates registry
 
 
 @dataclass(frozen=True)
 class WandbConfig:
     enabled: bool = True
-    project: str = "my-robot"
+    project: str = "mjlab"
     entity: str | None = None
-    group: str | None = None  # defaults to task name when None
+    group: str | None = None  # defaults to task_id when None
+    log_interval: int = 1
 
 
 @dataclass(frozen=True)
 class TrainConfig:
+    # Populated with registry defaults in _make_train_cfg(); all fields are
+    # individually overridable from the CLI (e.g. --env.scene.num-envs 2048).
+    env: ManagerBasedRlEnvCfg
+    agent: RslRlBaseRunnerCfg
     wandb: WandbConfig = field(default_factory=WandbConfig)
     log_dir: Path = Path("logs/rsl_rl")
     seed: int = 0
-    num_envs: int = 2048
-    checkpoint: Path | None = None  # resume from this path if set
+    checkpoint: Path | None = None
     video: bool = False
     video_length: int = 200
     video_interval: int = 2000
     enable_nan_guard: bool = False
     gpu_ids: list[int] | Literal["all"] | None = None
+
+    @staticmethod
+    def from_task(task_id: str) -> TrainConfig:
+        return TrainConfig(env=load_env_cfg(task_id), agent=load_rl_cfg(task_id))
 
 
 def _make_run_dir(log_dir: Path, experiment_name: str) -> Path:
@@ -61,7 +75,9 @@ def _make_run_dir(log_dir: Path, experiment_name: str) -> Path:
     return run_dir
 
 
-def _init_wandb(task_id: str, cfg: TrainConfig, run_dir: Path) -> wandb.sdk.wandb_run.Run | None:
+def _init_wandb(
+    task_id: str, cfg: TrainConfig, run_dir: Path
+) -> wandb.sdk.wandb_run.Run | None:
     if not cfg.wandb.enabled:
         return None
     return wandb.init(
@@ -70,44 +86,42 @@ def _init_wandb(task_id: str, cfg: TrainConfig, run_dir: Path) -> wandb.sdk.wand
         group=cfg.wandb.group or task_id,
         name=run_dir.name,
         dir=str(run_dir),
-        config={"task": task_id, "seed": cfg.seed},
-        sync_tensorboard=True,  # RSL-RL writes tensorboard; this syncs it automatically
+        config={"task": task_id, "seed": cfg.seed, **asdict(cfg.env), **asdict(cfg.agent)},
+        sync_tensorboard=True,  # RSL-RL writes TB summaries; this syncs them automatically
     )
 
 
 def run_train(task_id: str, cfg: TrainConfig, run_dir: Path) -> None:
-    """Training body. Called directly for single-GPU or via torchrunx for multi-GPU."""
-    cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-    if not cuda_visible:
+    """Training body — runs directly for single-GPU, via torchrunx for multi-GPU."""
+    cuda_available = torch.cuda.is_available()
+    if not cuda_available:
         device, rank, seed = "cpu", 0, cfg.seed
     else:
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
         rank = int(os.environ.get("RANK", "0"))
         os.environ["MUJOCO_EGL_DEVICE_ID"] = str(local_rank)
         device = f"cuda:{local_rank}"
-        seed = cfg.seed + local_rank  # different seed per process for diversity
+        seed = cfg.seed + local_rank  # per-process diversity
 
     configure_torch_backends()
 
-    env_cfg = load_env_cfg(task_id)
-    agent_cfg = load_rl_cfg(task_id)
+    # Apply seed to the configs that came in through CLI (already overridden by the user)
+    env_cfg = cfg.env
+    agent_cfg = cfg.agent
     env_cfg.seed = seed
     agent_cfg.seed = seed
 
     if cfg.enable_nan_guard:
         env_cfg.sim.nan_guard.enabled = True
 
-    # Logging setup is rank-0 only to avoid interleaved output and duplicate wandb runs
     logger.remove()
     logger.add(sys.stderr, level="INFO")
     if rank == 0:
         logger.add(run_dir / "train.log", level="DEBUG", rotation="50 MB")
         wandb_run = _init_wandb(task_id, cfg, run_dir)
-        logger.info("=" * 60)
-        logger.info(f"Task:     {task_id}")
-        logger.info(f"Seed:     {seed}  |  Num envs: {env_cfg.scene.num_envs}")
-        logger.info(f"Device:   {device}  |  Run dir: {run_dir}")
-        logger.info("=" * 60)
+        logger.info(f"Task:      {task_id}")
+        logger.info(f"Seed:      {seed}  |  Num envs: {env_cfg.scene.num_envs}")
+        logger.info(f"Device:    {device}  |  Run dir: {run_dir}")
     else:
         wandb_run = None
 
@@ -137,14 +151,16 @@ def run_train(task_id: str, cfg: TrainConfig, run_dir: Path) -> None:
         dump_yaml(run_dir / "params" / "agent.yaml", asdict(agent_cfg))
 
     if cfg.checkpoint is not None:
-        logger.info(f"Resuming from checkpoint: {cfg.checkpoint}")
+        if not cfg.checkpoint.exists():
+            logger.error(f"Checkpoint not found: {cfg.checkpoint}")
+            sys.exit(1)
+        logger.info(f"Resuming from: {cfg.checkpoint}")
         runner.load(str(cfg.checkpoint))
     elif agent_cfg.resume:
-        # Fall back to the path encoded in the agent config itself
         resume_path = get_checkpoint_path(
             run_dir.parent.parent, agent_cfg.load_run, agent_cfg.load_checkpoint
         )
-        logger.info(f"Resuming from checkpoint: {resume_path}")
+        logger.info(f"Resuming from: {resume_path}")
         runner.load(str(resume_path))
 
     try:
@@ -172,9 +188,7 @@ def run_train(task_id: str, cfg: TrainConfig, run_dir: Path) -> None:
 
 
 def launch(task_id: str, cfg: TrainConfig) -> None:
-    """Select GPUs and dispatch to run_train, using torchrunx for multi-GPU."""
-    agent_cfg = load_rl_cfg(task_id)  # only used to get experiment_name
-    run_dir = _make_run_dir(cfg.log_dir, agent_cfg.experiment_name)
+    run_dir = _make_run_dir(cfg.log_dir, cfg.agent.experiment_name)
 
     selected_gpus, num_gpus = select_gpus(cfg.gpu_ids)
     os.environ["CUDA_VISIBLE_DEVICES"] = (
@@ -186,7 +200,7 @@ def launch(task_id: str, cfg: TrainConfig) -> None:
         run_train(task_id, cfg, run_dir)
         return
 
-    import torchrunx  # lazy import, only needed for multi-GPU
+    import torchrunx
 
     logging.basicConfig(level=logging.INFO)
     os.environ.setdefault("TORCHRUNX_LOG_DIR", str(run_dir / "torchrunx"))
@@ -206,7 +220,12 @@ def main() -> None:
         add_help=False,
         return_unknown_args=True,
     )
-    cfg = tyro.cli(TrainConfig, args=remaining, prog=f"{sys.argv[0]} {task_id}")
+    cfg = tyro.cli(
+        TrainConfig,
+        args=remaining,
+        default=TrainConfig.from_task(task_id),  # registry defaults, then CLI overrides
+        prog=f"{sys.argv[0]} {task_id}",
+    )
     launch(task_id, cfg)
 
 
