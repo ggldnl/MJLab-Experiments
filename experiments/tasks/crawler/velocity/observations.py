@@ -13,13 +13,17 @@ from mjlab.envs.mdp.observations import (
   last_action,
   projected_gravity,
 )
+from mjlab.managers import SceneEntityCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
 from mjlab.tasks.velocity.mdp.observations import (
   foot_air_time,
   foot_contact,
   foot_contact_forces,
+  foot_height
 )
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
+
+from experiments.robots.crawler.constants import CRAWLER_FOOT_SITE_NAMES
 
 
 actor_terms = {
@@ -69,6 +73,10 @@ critic_terms = {
   "feet_contact_forces": ObservationTermCfg(
       func=foot_contact_forces,
       params={"sensor_name": "feet_ground_contact"},
+  ),
+  "feet_height": ObservationTermCfg(
+    func=foot_height,
+    params={"asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES)},
   ),
 }
 

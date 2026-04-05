@@ -101,22 +101,25 @@ rewards = {
     },
   ),
   "feet_clearance": RewardTermCfg(
-      func=feet_clearance,
-      weight=0.1,
-      params={
-          "sensor_name": "feet_ground_contact",
-          "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
-          "target_height": 0.025,
-      },
+    func=feet_clearance,
+    weight=-0.1,
+    params={
+      "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
+      "target_height": 0.05,
+      "command_name": "twist",
+      "command_threshold": 0.05,  # cm
+    },
   ),
   "feet_swing_height": RewardTermCfg(
-      func=feet_swing_height,
-      weight=0.1,
-      params={
-          "sensor_name": "feet_ground_contact",
-          "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
-          "target_height": 0.05,  # should match feet_clearance
-      },
+    func=feet_swing_height,
+    weight=0.1,
+    params={
+      "sensor_name": "feet_ground_contact",
+      "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
+      "target_height": 0.025,
+      "command_name": "twist",
+      "command_threshold": 0.05,
+    },
   ),
   "foot_slip": RewardTermCfg(
     func=feet_slip,
