@@ -16,7 +16,7 @@ from experiments.robots.crawler.constants import CRAWLER_BASE_NAME
 from experiments.robots.crawler.sensors import (
   FEET_GROUND_CONTACT_SENSOR,
   # FOOT_HEIGHT_SCAN,
-  NONFOOT_GROUND_CONTACT_SENSOR,
+  # NONFEET_GROUND_CONTACT_SENSOR,
   SELF_COLLISION_SENSOR,
 )
 
@@ -35,7 +35,7 @@ def scene_cfg(play: bool = False, num_envs: int = 2048) -> SceneCfg:
     sensors=(
       FEET_GROUND_CONTACT_SENSOR,
       # FOOT_HEIGHT_SCAN,
-      NONFOOT_GROUND_CONTACT_SENSOR,
+      # NONFEET_GROUND_CONTACT_SENSOR,
       SELF_COLLISION_SENSOR,
     ),
     num_envs=num_envs,

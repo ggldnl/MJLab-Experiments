@@ -18,7 +18,6 @@ from mjlab.tasks.velocity.mdp.observations import (
   foot_air_time,
   foot_contact,
   foot_contact_forces,
-  foot_height,
 )
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
@@ -41,7 +40,9 @@ actor_terms = {
     func=joint_vel_rel,
     noise=Unoise(n_min=-1.5, n_max=1.5),
   ),
-  "actions": ObservationTermCfg(func=last_action),
+  "actions": ObservationTermCfg(
+    func=last_action
+  ),
   "command": ObservationTermCfg(
     func=generated_commands,
     params={"command_name": "twist"},
@@ -57,25 +58,17 @@ critic_terms = {
     params={"sensor_name": "robot/imu_lin_vel"},
     noise=Unoise(n_min=-0.5, n_max=0.5),
   ),
-
-  """
-  "foot_height": ObservationTermCfg(
-    func=foot_height,
-    params={"sensor_name": "foot_height_scan"},
+  "feet_contact": ObservationTermCfg(
+      func=foot_contact,
+      params={"sensor_name": "feet_ground_contact"},
   ),
-  """
-  
-  "foot_air_time": ObservationTermCfg(
-    func=foot_air_time,
-    params={"sensor_name": "feet_ground_contact"},
+  "feet_air_time": ObservationTermCfg(
+      func=foot_air_time,
+      params={"sensor_name": "feet_ground_contact"},
   ),
-  "foot_contact": ObservationTermCfg(
-    func=foot_contact,
-    params={"sensor_name": "feet_ground_contact"},
-  ),
-  "foot_contact_forces": ObservationTermCfg(
-    func=foot_contact_forces,
-    params={"sensor_name": "feet_ground_contact"},
+  "feet_contact_forces": ObservationTermCfg(
+      func=foot_contact_forces,
+      params={"sensor_name": "feet_ground_contact"},
   ),
 }
 

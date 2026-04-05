@@ -4,8 +4,6 @@ from mjlab.sensor import (
   GridPatternCfg,
   ObjRef,
   RayCastSensorCfg,
-  # RingPatternCfg,
-  # TerrainHeightSensorCfg,
 )
 
 from .constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_GEOM_NAMES
@@ -24,18 +22,19 @@ FEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
     entity="robot",
   ),
   secondary=ContactMatch(
-    mode="geom",
+    mode="body",
     pattern=r"terrain",
   ),
   fields=("found", "force"),
   reduce="netforce",
-  num_slots=4,
+  num_slots=1,
   history_length=1,
   track_air_time=True,
 )
 
-NONFOOT_GROUND_CONTACT_SENSOR = ContactSensorCfg(
-  name="nonfoot_ground_touch",
+"""
+NONFEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
+  name="nonfeet_ground_contact",
   primary=ContactMatch(
     mode="geom",
     entity="robot",
@@ -48,6 +47,7 @@ NONFOOT_GROUND_CONTACT_SENSOR = ContactSensorCfg(
   num_slots=1,
   history_length=1,
 )
+"""
 
 # Self-collision sensor
 # Detects collisions between robot base and body parts. Useful for penalty/safety rewards
@@ -59,23 +59,6 @@ SELF_COLLISION_SENSOR = ContactSensorCfg(
   reduce="none",
   num_slots=1,
   history_length=4,
-)
-
-FOOT_FOOT_CONTACT_SENSOR = ContactSensorCfg(
-  name="foot_foot_contact",
-  primary=ContactMatch(
-    mode="geom",
-    pattern=r"leg_[1-4]_tibia_geom",
-    entity="robot",
-  ),
-  secondary=ContactMatch(
-    mode="geom",
-    pattern=r"leg_[1-4]_tibia_geom",
-    entity="robot",
-  ),
-  fields=("found", "force"),
-  reduce="none",
-  num_slots=1,
 )
 
 # Simulation only sensor
@@ -92,7 +75,6 @@ FOOT_HEIGHT_SCAN = TerrainHeightSensorCfg(
   exclude_parent_body=True,
   include_geom_groups=(0,),  # Terrain only.
 )
-"""
 
 TERRAIN_SCAN = RayCastSensorCfg(
   name="terrain_scan",
@@ -104,3 +86,4 @@ TERRAIN_SCAN = RayCastSensorCfg(
   debug_vis=True,
   viz=RayCastSensorCfg.VizCfg(show_normals=True),
 )
+"""
