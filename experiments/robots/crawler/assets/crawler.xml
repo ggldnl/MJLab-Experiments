@@ -93,7 +93,6 @@
         <velocimeter name="imu_lin_vel" site="imu"/>
         <accelerometer name="imu_lin_acc" site="imu"/>
         <framequat name="orientation" objtype="site" objname="imu"/>
-        <subtreeangmom name="root_angmom" body="Trunk"/>
     </sensor>
 
 </mujoco>
