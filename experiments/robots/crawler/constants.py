@@ -38,11 +38,32 @@ INIT_STATE = EntityCfg.InitialStateCfg(
 
 # Constants
 
+CRAWLER_FEMUR_GEOM_NAMES = (
+    "leg_1_femur_geom",
+    "leg_2_femur_geom",
+    "leg_3_femur_geom",
+    "leg_4_femur_geom",
+)
+
+CRAWLER_TIBIA_GEOM_NAMES = (
+    "leg_1_tibia_geom",
+    "leg_2_tibia_geom",
+    "leg_3_tibia_geom",
+    "leg_4_tibia_geom",
+)
+
 CRAWLER_FOOT_GEOM_NAMES = (
     "leg_1_foot_geom",
     "leg_2_foot_geom",
     "leg_3_foot_geom",
     "leg_4_foot_geom",
+)
+
+CRAWLER_FOOT_SITE_NAMES = (
+    "leg_1_foot_site",
+    "leg_2_foot_site",
+    "leg_3_foot_site",
+    "leg_4_foot_site",
 )
 
 CRAWLER_BASE_NAME = "base"
@@ -67,3 +88,4 @@ IMU_ANG_VEL = BuiltinSensorCfg(
 obs = scene["imu_ang_vel"]
 """
 CRAWLER_IMU_SITE_NAME = "robot/imu"
+CRAWLER_ROOT_ANGMOM = "robot/base"

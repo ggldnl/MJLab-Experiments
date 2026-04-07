@@ -12,6 +12,7 @@ from mjlab.envs.mdp.observations import (
   joint_vel_rel,
   last_action,
   projected_gravity,
+  height_scan
 )
 from mjlab.managers import SceneEntityCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
@@ -23,10 +24,16 @@ from mjlab.tasks.velocity.mdp.observations import (
 )
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
-from experiments.robots.crawler.constants import CRAWLER_FOOT_SITE_NAMES
+from experiments.robots.crawler.constants import CRAWLER_FOOT_GEOM_NAMES
+from experiments.robots.crawler.sensors import TERRAIN_SCAN
 
 
 actor_terms = {
+  "base_lin_vel": ObservationTermCfg(
+      func=builtin_sensor,
+      params={"sensor_name": "imu_lin_vel"},
+      noise=Unoise(n_min=-0.5, n_max=0.5),
+    ),
   "base_ang_vel": ObservationTermCfg(
     func=builtin_sensor,
     params={"sensor_name": "imu_ang_vel"},
@@ -42,7 +49,7 @@ actor_terms = {
   ),
   "joint_vel": ObservationTermCfg(
     func=joint_vel_rel,
-    noise=Unoise(n_min=-0.25, n_max=0.25),
+    noise=Unoise(n_min=-1.5, n_max=1.5),
   ),
   "actions": ObservationTermCfg(
     func=last_action
@@ -51,16 +58,22 @@ actor_terms = {
     func=generated_commands,
     params={"command_name": "twist"},
   ),
+  "height_scan": ObservationTermCfg(
+    func=height_scan,
+    params={"sensor_name": "terrain_scan"},
+    noise=Unoise(n_min=-0.1, n_max=0.1),
+    scale=1 / TERRAIN_SCAN.max_distance,
+  ),
 }
 
 # Critic takes all the terms of the actor + observations from environment e.g. foot height, ...
 
 critic_terms = {
   **actor_terms,
-  "base_lin_vel": ObservationTermCfg(
-    func=builtin_sensor,
-    params={"sensor_name": "imu_lin_vel"},
-    noise=Unoise(n_min=-0.5, n_max=0.5),
+  "height_scan": ObservationTermCfg(
+    func=height_scan,
+    params={"sensor_name": "terrain_scan"},
+    scale=1 / TERRAIN_SCAN.max_distance,
   ),
   "feet_contact": ObservationTermCfg(
       func=foot_contact,
@@ -76,7 +89,7 @@ critic_terms = {
   ),
   "feet_height": ObservationTermCfg(
     func=foot_height,
-    params={"asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES)},
+    params={"asset_cfg": SceneEntityCfg("robot", geom_names=CRAWLER_FOOT_GEOM_NAMES)},
   ),
 }
 

@@ -65,20 +65,20 @@ curriculum = {
         {
           "step": 0,
           "lin_vel_x": (-1.0, 1.0),
-          "lin_vel_y": (-0.5, 0.5),
+          "lin_vel_y": (-1.0, 1.0),
           "ang_vel_z": (-0.5, 0.5),
         },
         {
           "step": 5000 * 24,
-          "lin_vel_x": (-1.5, 2.0),
-          "lin_vel_y": (-1.0, 1.0),
-          "ang_vel_z": (-0.7, 0.7),
+          "lin_vel_x": (-2.0, 2.0),
+          "lin_vel_y": (-2.0, 2.0),
+          "ang_vel_z": (-1.0, 1.0),
         },
         {
           "step": 10000 * 24,
-          "lin_vel_x": (-2.0, 3.0),
-          "lin_vel_y": (-2.0, 2.0),
-          "ang_vel_z": (-1.0, 1.0),
+          "lin_vel_x": (-3.0, 3.0),
+          "lin_vel_y": (-3.0, 3.0),
+          "ang_vel_z": (-2.0, 2.0),
         },
       ],
     },
@@ -86,7 +86,10 @@ curriculum = {
 }
 
 terminations = {
-  "time_out": TerminationTermCfg(func=time_out, time_out=True),
+  "time_out": TerminationTermCfg(
+    func=time_out,
+    time_out=True
+  ),
   "fell_over": TerminationTermCfg(
     func=bad_orientation,
     params={"limit_angle": math.radians(70.0)},

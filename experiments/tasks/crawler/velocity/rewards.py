@@ -22,7 +22,8 @@ from mjlab.tasks.velocity.mdp import (
   track_angular_velocity,
   track_linear_velocity,
   feet_clearance,
-  feet_swing_height
+  feet_swing_height,
+  angular_momentum_penalty
 )
 from mjlab.envs import ManagerBasedRlEnv
 from mjlab.utils.lab_api.math import quat_apply_inverse
@@ -53,15 +54,15 @@ def flat_orientation(
 rewards = {
   "track_linear_velocity": RewardTermCfg(
     func=track_linear_velocity,
-    weight=1.0,
+    weight=2.0,
     params={
       "command_name": "twist",
-      "std": math.sqrt(0.5)
+      "std": math.sqrt(0.25)
     },
   ),
   "track_angular_velocity": RewardTermCfg(
     func=track_angular_velocity,
-    weight=1.0,
+    weight=2.0,
     params={
       "command_name": "twist",
       "std": math.sqrt(0.5)
@@ -71,18 +72,10 @@ rewards = {
     func=flat_orientation,
     weight=1.0,
     params={
-      "std": math.sqrt(0.5),
+      "std": math.sqrt(0.2),
     },
   ),
-  """
-  "joint_vel_reward": RewardTermCfg(
-      func=joint_vel_l1,
-      weight=0.1,
-      params={
-        "threshold": 0.2
-      },
-  ),
-  """
+  # TODO add pose reward
   "body_ang_vel": RewardTermCfg(
     func=body_angular_velocity_penalty,
     weight=-0.5,
@@ -90,13 +83,18 @@ rewards = {
       "asset_cfg": SceneEntityCfg("robot", body_names=CRAWLER_BASE_NAME)
     },
   ),
+  "angular_momentum": RewardTermCfg(
+    func=angular_momentum_penalty,
+    weight=-0.5,
+    params={"sensor_name": "root_angmom"},
+  ),
   "dof_pos_limits": RewardTermCfg(
     func=joint_pos_limits,
-    weight=-0.5
+    weight=-1.0
   ),
   "action_rate_l2": RewardTermCfg(
     func=action_rate_l2,
-    weight=-0.25
+    weight=-0.1
   ),
   "air_time": RewardTermCfg(
     func=feet_air_time,
@@ -111,17 +109,17 @@ rewards = {
   ),
   "feet_clearance": RewardTermCfg(
     func=feet_clearance,
-    weight=0.2,
+    weight=-2.0,
     params={
       "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
-      "target_height": 0.05,
+      "target_height": 0.025,  # cm
       "command_name": "twist",
-      "command_threshold": 0.05,  # cm
+      "command_threshold": 0.05,
     },
   ),
   "feet_swing_height": RewardTermCfg(
     func=feet_swing_height,
-    weight=0.2,
+    weight=-0.25,
     params={
       "sensor_name": "feet_ground_contact",
       "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
@@ -142,7 +140,7 @@ rewards = {
   ),
   "soft_landing": RewardTermCfg(
     func=soft_landing,  # Penalize high foot impact forces
-    weight=0.25,
+    weight=-0.25,
     params={
       "sensor_name": "feet_ground_contact",
       "command_name": "twist",
@@ -151,10 +149,10 @@ rewards = {
   ),
   "self_collisions": RewardTermCfg(
     func=self_collision_cost,
-    weight=0.0,
+    weight=-0.5,
     params={
       "sensor_name": "self_collision",
-      "force_threshold": 10.0
+      "force_threshold": 1.0
     },
   ),
 }
