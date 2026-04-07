@@ -12,10 +12,10 @@ from mjlab.sensor import (
 from experiments.robots.crawler.constants import (
   CRAWLER_BASE_NAME,
   CRAWLER_IMU_SITE_NAME,
+  CRAWLER_BASE_SITE_NAME,
   CRAWLER_FOOT_GEOM_NAMES,
   CRAWLER_FEMUR_GEOM_NAMES,
   CRAWLER_TIBIA_GEOM_NAMES,
-  CRAWLER_ROOT_ANGMOM
 )
 
 
@@ -86,7 +86,7 @@ SELF_COLLISION_SENSOR = ContactSensorCfg(
   history_length=4,
 )
 
-# Simulation only sensor (raycast)
+# Simulation only sensor
 
 TERRAIN_SCAN = RayCastSensorCfg(
   name="terrain_scan",
@@ -104,7 +104,7 @@ TERRAIN_SCAN = RayCastSensorCfg(
 ROOT_ANGMOM = BuiltinSensorCfg(
     name="root_angmom",
     sensor_type="subtreeangmom",
-    obj=ObjRef(type="body", name=CRAWLER_ROOT_ANGMOM, entity="robot"),
+    obj=ObjRef(type="body", name=CRAWLER_BASE_SITE_NAME),
 )
 
 # IMU sensors

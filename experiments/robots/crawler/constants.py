@@ -88,4 +88,4 @@ IMU_ANG_VEL = BuiltinSensorCfg(
 obs = scene["imu_ang_vel"]
 """
 CRAWLER_IMU_SITE_NAME = "robot/imu"
-CRAWLER_ROOT_ANGMOM = "robot/base"
+CRAWLER_BASE_SITE_NAME = "robot/base"
