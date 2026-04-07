@@ -2,9 +2,9 @@
 
 from mjlab.entity import EntityCfg
 
-from .actuators import CRAWLER_ARTICULATIONS
-from .collisions import CRAWLER_COLLISIONS
-from .constants import get_spec, INIT_STATE
+from experiments.robots.crawler.actuators import CRAWLER_ARTICULATIONS
+from experiments.robots.crawler.collisions import CRAWLER_COLLISIONS
+from experiments.robots.crawler.constants import get_spec, INIT_STATE
 
 
 def get_crawler_robot_cfg() -> EntityCfg:

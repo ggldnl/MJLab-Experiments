@@ -18,6 +18,7 @@ from experiments.robots.crawler.sensors import (
   # FOOT_HEIGHT_SCAN,
   # NONFEET_GROUND_CONTACT_SENSOR,
   SELF_COLLISION_SENSOR,
+  IMU
 )
 
 from .terrains import play_terrain_cfg, training_terrain_cfg
@@ -37,6 +38,7 @@ def scene_cfg(play: bool = False, num_envs: int = 2048) -> SceneCfg:
       # FOOT_HEIGHT_SCAN,
       # NONFEET_GROUND_CONTACT_SENSOR,
       SELF_COLLISION_SENSOR,
+      *IMU
     ),
     num_envs=num_envs,
     extent=10.0,

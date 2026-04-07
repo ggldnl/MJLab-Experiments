@@ -30,7 +30,7 @@ python crawler/config.py
 
 Start training:
 ```bash
-python scripts/train.py crawler_velocity --wandb.project crawler_velocity
+python utils/train.py crawler_velocity --wandb.project crawler_velocity
 ```
 
 Observe the policy:

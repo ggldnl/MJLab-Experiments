@@ -7,8 +7,8 @@ from mjlab.entity import EntityCfg
 from mjlab.utils.os import update_assets
 
 
-_HERE = Path(__file__).parent
-CRAWLER_DESCRIPTION_PATH: Path = _HERE / "assets" / "crawler.xml"
+LOCAL_FOLDER = Path(__file__).parent
+CRAWLER_DESCRIPTION_PATH: Path = LOCAL_FOLDER / "assets" / "crawler.xml"
 assert CRAWLER_DESCRIPTION_PATH.exists()
 
 
@@ -25,31 +25,45 @@ def get_spec() -> mujoco.MjSpec:
 
 # Keyframes
 
+# Robot standing initially, no need to learn how to get up
 INIT_STATE = EntityCfg.InitialStateCfg(
-    pos=(0.0, 0.0, 0.08),
+    pos=(0.0, 0.0, 2.0),
     joint_pos={
-        ".*coxa": 0.0,
-        ".*femur": -0.25,
-        ".*tibia": -1.75,
+        "base_leg_[1-4]_coxa": 0.0,
+        "leg_[1-4]_coxa_leg_[1-4]_femur": -0.25,
+        "leg_[1-4]_femur_leg_[1-4]_tibia": -1.75,
     },
     joint_vel={".*": 0.0},
 )
 
-# Leg geometry/site names used by the env config
-# TODO it would be better to define a foot in the model, so that we avoid
-#  unintended collisions with the rest of the tibia
-CRAWLER_FOOT_GEOM_NAMES = (
-    "leg_1_tibia_geom",
-    "leg_2_tibia_geom",
-    "leg_3_tibia_geom",
-    "leg_4_tibia_geom",
-)
+# Constants
 
-CRAWLER_FOOT_SITE_NAMES = (
-    "leg_1_foot",
-    "leg_2_foot",
-    "leg_3_foot",
-    "leg_4_foot",
+CRAWLER_FOOT_GEOM_NAMES = (
+    "leg_1_foot_geom",
+    "leg_2_foot_geom",
+    "leg_3_foot_geom",
+    "leg_4_foot_geom",
 )
 
 CRAWLER_BASE_NAME = "base"
+
+# Entity-scoped sites: we will attach all sensors through python,
+# minimal manual XML editing. We will only need some sites to attach
+# the sensors to.
+
+"""
+# Entity-scoped site
+CRAWLER_IMU_SITE_NAME = "robot/imu"
+
+# Sensor should use plain name (sensors.py)
+imu_site = ObjRef(type="site", name=CRAWLER_IMU_SITE_NAME)
+IMU_ANG_VEL = BuiltinSensorCfg(
+  name="imu_ang_vel",
+  sensor_type="gyro",
+  obj=imu_site,
+)
+
+# Observations should use plain name (observations.py)
+obs = scene["imu_ang_vel"]
+"""
+CRAWLER_IMU_SITE_NAME = "robot/imu"

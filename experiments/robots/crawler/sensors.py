@@ -1,24 +1,29 @@
+"""Crawler sensors."""
+
 from mjlab.sensor import (
   ContactMatch,
   ContactSensorCfg,
   GridPatternCfg,
   ObjRef,
   RayCastSensorCfg,
+  BuiltinSensorCfg
 )
 
-from .constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_GEOM_NAMES
+from experiments.robots.crawler.constants import (
+  CRAWLER_BASE_NAME,
+  CRAWLER_IMU_SITE_NAME,
+  CRAWLER_FOOT_GEOM_NAMES
+)
 
 
-# Contact Sensor Configurations (for observation/reward)
-# These create MuJoCo contact sensors dynamically (NOT in XML)
+# Contact Sensor Configurations
 
-# Foot-ground contact sensor
 # Tracks aggregate contact between each foot body and terrain
 FEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
   name="feet_ground_contact",
   primary=ContactMatch(
     mode="geom",
-    pattern=r"leg_[1-4]_tibia_geom",
+    pattern=CRAWLER_FOOT_GEOM_NAMES,
     entity="robot",
   ),
   secondary=ContactMatch(
@@ -32,7 +37,6 @@ FEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
   track_air_time=True,
 )
 
-"""
 NONFEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
   name="nonfeet_ground_contact",
   primary=ContactMatch(
@@ -47,9 +51,9 @@ NONFEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
   num_slots=1,
   history_length=1,
 )
-"""
 
-# Self-collision sensor
+# Self-collision sensors
+
 # Detects collisions between robot base and body parts. Useful for penalty/safety rewards
 SELF_COLLISION_SENSOR = ContactSensorCfg(
   name="self_collision",
@@ -87,3 +91,38 @@ TERRAIN_SCAN = RayCastSensorCfg(
   viz=RayCastSensorCfg.VizCfg(show_normals=True),
 )
 """
+
+# IMU sensors
+
+imu_site = ObjRef(type="site", name=CRAWLER_IMU_SITE_NAME)
+
+IMU_ANG_VEL = BuiltinSensorCfg(
+  name="imu_ang_vel",
+  sensor_type="gyro",
+  obj=imu_site,
+)
+
+IMU_LIN_VEL = BuiltinSensorCfg(
+  name="imu_lin_vel",
+  sensor_type="velocimeter",
+  obj=imu_site,
+)
+
+IMU_LIN_ACC = BuiltinSensorCfg(
+  name="imu_lin_acc",
+  sensor_type="accelerometer",
+  obj=imu_site,
+)
+
+IMU_ORIENTATION = BuiltinSensorCfg(
+  name="orientation",
+  sensor_type="framequat",
+  obj=imu_site,
+)
+
+IMU = (
+  IMU_ANG_VEL,
+  IMU_LIN_VEL,
+  IMU_LIN_ACC,
+  IMU_ORIENTATION,
+)

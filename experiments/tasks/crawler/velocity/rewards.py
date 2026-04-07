@@ -74,6 +74,15 @@ rewards = {
       "std": math.sqrt(0.5),
     },
   ),
+  """
+  "joint_vel_reward": RewardTermCfg(
+      func=joint_vel_l1,
+      weight=0.1,
+      params={
+        "threshold": 0.2
+      },
+  ),
+  """
   "body_ang_vel": RewardTermCfg(
     func=body_angular_velocity_penalty,
     weight=-0.5,
@@ -97,12 +106,12 @@ rewards = {
       "threshold_min": 0.05,
       "threshold_max": 0.5,
       "command_name": "twist",
-      "command_threshold": 0.5,
+      "command_threshold": 0.1,
     },
   ),
   "feet_clearance": RewardTermCfg(
     func=feet_clearance,
-    weight=-0.1,
+    weight=0.2,
     params={
       "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
       "target_height": 0.05,
@@ -112,7 +121,7 @@ rewards = {
   ),
   "feet_swing_height": RewardTermCfg(
     func=feet_swing_height,
-    weight=0.1,
+    weight=0.2,
     params={
       "sensor_name": "feet_ground_contact",
       "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
@@ -142,7 +151,7 @@ rewards = {
   ),
   "self_collisions": RewardTermCfg(
     func=self_collision_cost,
-    weight=-1.0,
+    weight=0.0,
     params={
       "sensor_name": "self_collision",
       "force_threshold": 10.0
