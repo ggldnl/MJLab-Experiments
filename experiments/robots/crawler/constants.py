@@ -25,9 +25,12 @@ def get_spec() -> mujoco.MjSpec:
 
 # Keyframes
 
-# Robot standing initially, no need to learn how to get up
+# Robot standing initially, no need to learn how to get up.
+# We need to manually tune the initial height. Using a kinematic
+# model to derive this will defy the sole purpose of using DRL:
+# it's difficult to have models for complex robots.
 INIT_STATE = EntityCfg.InitialStateCfg(
-    pos=(0.0, 0.0, 2.0),
+    pos=(0.0, 0.0, 0.04),
     joint_pos={
         "base_leg_[1-4]_coxa": 0.0,
         "leg_[1-4]_coxa_leg_[1-4]_femur": -0.25,
@@ -37,6 +40,9 @@ INIT_STATE = EntityCfg.InitialStateCfg(
 )
 
 # Constants
+
+# Indices for leg diagonal pairs, used for trot and fast gait.
+CRAWLER_LEG_DIAGONAL_PAIRS = [(0, 2), (1, 3)]
 
 CRAWLER_FEMUR_GEOM_NAMES = (
     "leg_1_femur_geom",

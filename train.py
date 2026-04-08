@@ -107,9 +107,11 @@ def run_train(task_id: str, cfg: TrainConfig) -> None:
 
     wandb_run = _init_wandb(task_id, cfg, run_dir)
 
-    logger.info(f"Task:    {task_id}")
-    logger.info(f"Seed:    {cfg.seed}  |  Num envs: {env_cfg.scene.num_envs}")
-    logger.info(f"Device:  {device}  |  Run dir: {run_dir}")
+    logger.info(f"Task:         {task_id}")
+    logger.info(f"Seed:         {cfg.seed}")
+    logger.info(f"Num envs:     {env_cfg.scene.num_envs}")
+    logger.info(f"Device:       {device}")
+    logger.info(f"Run dir:      {run_dir}")
 
     env = ManagerBasedRlEnv(cfg=env_cfg, device=device)
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)

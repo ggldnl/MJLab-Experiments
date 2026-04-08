@@ -42,7 +42,6 @@ ACTION_SCALES = {joint: ACTION_FRACTION * rng for joint, rng in JOINT_RANGE.item
 # Smaller joints automatically use less of the budget.
 EFFORT_LIMIT = STALL_TORQUE
 STIFFNESS = EFFORT_LIMIT * LOAD_FACTOR / max(ACTION_SCALES.values())
-# 0.18 * 0.80 / 0.40 = 0.36 Nm/rad
 
 # Damping from the standard critically-damped PD formula
 DAMPING = 2.0 * DAMPING_RATIO * math.sqrt(STIFFNESS * ARMATURE)

@@ -2,6 +2,11 @@
 A flat dictionary of RewardTermCfg entries, each with a func, a scalar weight, and params.
 Positive weights encourage behaviors; negative weights penalize them. Reward tuning is
 iterative and messy, so having it on a dedicated file could be useful.
+
+The general rule is: no penalty term should ever produce a per-episode magnitude larger
+than the primary reward term's weight. The primary reward is track_linear_velocity
+at weight 4.0. Any penalty that routinely produces -10, -40 etc. will always win
+the gradient competition.
 """
 
 import math
@@ -9,26 +14,62 @@ import torch
 
 from mjlab.envs.mdp import (
   action_rate_l2,
-  joint_pos_limits,
+  joint_vel_l2,
 )
 from mjlab.managers import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.tasks.velocity.mdp import (
-  body_angular_velocity_penalty,
   feet_air_time,
   feet_slip,
   self_collision_cost,
-  soft_landing,
   track_angular_velocity,
   track_linear_velocity,
-  feet_clearance,
-  feet_swing_height,
-  angular_momentum_penalty
+  is_terminated,
 )
 from mjlab.envs import ManagerBasedRlEnv
 from mjlab.utils.lab_api.math import quat_apply_inverse
 
-from experiments.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_SITE_NAMES
+from experiments.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_SITE_NAMES, CRAWLER_LEG_DIAGONAL_PAIRS
+
+
+_DEFAULT_ASSET_CFG = SceneEntityCfg("robot", joint_names=".*")
+
+
+def trot_stability(
+  env: ManagerBasedRlEnv,
+  sensor_name: str,
+  command_name: str,
+  command_threshold: float = 0.05,
+  mode: str = "two_legs"
+) -> torch.Tensor:
+  """
+  Reward trot stability. Two modes can be used to ensure stability:
+  - diagonal leg pairs being in the same contact phase (both grounded or both airborne) results
+    in a highly dynamic gait which is often unfeasible in reality
+  - only one leg at a time could swing, the other three stay on the ground and propel the
+    body forward
+  """
+
+  sensor = env.scene.sensors[sensor_name]
+  found = sensor.data.found.reshape(env.num_envs, -1).float()  # [B, num_feet]
+
+  reward = torch.zeros(env.num_envs, device=env.device)
+  if mode == "two_legs":
+    for i, j in CRAWLER_LEG_DIAGONAL_PAIRS:
+      # 1.0 when both grounded or both airborne, 0.0 when mismatched
+      same_phase = 1.0 - torch.abs(found[:, i] - found[:, j])
+      reward += same_phase
+    reward /= len(CRAWLER_LEG_DIAGONAL_PAIRS)  # normalize to [0, 1]
+  elif mode == "three_legs":
+    num_grounded = torch.sum(found, dim=1)
+    reward = 1.0 - torch.abs(num_grounded - 3.0) / 3.0
+    reward = torch.clamp(reward, min=0.0)
+
+  command = env.command_manager.get_command(command_name)
+  total_command = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+  scale = (total_command > command_threshold).float()
+
+  return reward * scale
 
 
 def flat_orientation(
@@ -50,87 +91,150 @@ def flat_orientation(
 
   return torch.exp(-xy_squared / std**2)
 
+def base_height(
+  env: ManagerBasedRlEnv,
+  target_height: float,
+  std: float
+) -> torch.Tensor:
+  """
+  Reward staying close to a target base height.
+  Uses a Gaussian kernel so small deviations are tolerated but large ones are penalized.
+  Adjust target_height to match your robot's nominal standing height.
+  """
+
+  asset = env.scene["robot"]
+  base_id = asset.find_bodies(CRAWLER_BASE_NAME)[0]
+
+  height = asset.data.body_link_pos_w[:, base_id, 2].squeeze(-1)  # Z coordinate [B]
+  height_error_sq = (height - target_height) ** 2
+
+  return torch.exp(-height_error_sq / std ** 2)
+
+def stand_still(
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  command_threshold: float = 0.05,
+  std: float = 0.1,
+) -> torch.Tensor:
+  """
+  Penalize the robot standing still.
+  """
+
+  asset = env.scene["robot"]
+
+  # Measure actual world-space motion, not joint displacement
+  speed = torch.norm(asset.data.root_link_vel_w[:, :2], dim=1)
+  stillness = torch.exp(-speed / std)  # near 1.0 when not translating
+
+  command = env.command_manager.get_command(command_name)
+  total_command = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
+  scale = (total_command > command_threshold).float()
+
+  return stillness * scale
+
+
+def nonfeet_ground_contact(
+  env: ManagerBasedRlEnv,
+  sensor_name: str = "nonfeet_ground_contact",
+) -> torch.Tensor:
+  """
+  Penalize any contact between non-foot geoms and the terrain.
+  """
+
+  sensor = env.scene.sensors[sensor_name]
+  found = sensor.data.found.reshape(env.num_envs, -1)  # [B, N]
+  return found.float().sum(dim=1)
+
+
+def base_stability(
+  env: ManagerBasedRlEnv,
+  std: float = 0.5,
+) -> torch.Tensor:
+  """
+  Penalize roll and pitch angular velocity of the base during locomotion.
+  This targets dynamic wobble and tilting while walking, which the static
+  orientation term (posture) cannot capture: a robot can be momentarily
+  upright but still oscillating heavily.
+  Uses a Gaussian so small wobble is tolerated and only large rates are
+  penalized strongly.
+  """
+
+  asset = env.scene["robot"]
+
+  # root_link_vel_w is [B, 6]: [:3] linear, [3:] angular in world frame
+  # indices 3 and 4 are roll rate and pitch rate respectively
+  roll_pitch_vel = asset.data.root_link_vel_w[:, 3:5]  # [B, 2]
+  wobble_sq = torch.sum(roll_pitch_vel ** 2, dim=1)  # [B]
+
+  return torch.exp(-wobble_sq / std**2) - 1.0  # 0.0 when still, -1.0 at large wobble
+
 
 rewards = {
+
+  # Positive signals: define what the robot should do
+
+  # Velocity tracking is the primary objective; weights must dominate all penalties.
   "track_linear_velocity": RewardTermCfg(
     func=track_linear_velocity,
-    weight=2.0,
+    weight=4.0,
     params={
       "command_name": "twist",
-      "std": math.sqrt(0.25)
+      "std": math.sqrt(0.25),
     },
   ),
   "track_angular_velocity": RewardTermCfg(
     func=track_angular_velocity,
-    weight=2.0,
+    weight=4.0,
     params={
       "command_name": "twist",
-      "std": math.sqrt(0.5)
+      "std": math.sqrt(0.5),
     },
   ),
+
+  # Postural stability: keep the robot upright and at the right height.
   "upright": RewardTermCfg(
-    func=flat_orientation,
+      func=flat_orientation,
+      weight=1.0,
+      params={
+          "std": math.sqrt(0.2),
+      },
+  ),
+
+  # Encourages the robot to keep a fixed base height
+  "base_height": RewardTermCfg(
+    func=base_height,
     weight=1.0,
     params={
-      "std": math.sqrt(0.2),
+      "target_height": 0.02,
+      "std": 0.05,
     },
   ),
-  # TODO add pose reward
-  "body_ang_vel": RewardTermCfg(
-    func=body_angular_velocity_penalty,
-    weight=-0.5,
+
+  # Dynamic base stability: penalizes roll and pitch angular velocity
+  "base_stability": RewardTermCfg(
+    func=base_stability,
+    weight=-1.0,
     params={
-      "asset_cfg": SceneEntityCfg("robot", body_names=CRAWLER_BASE_NAME)
+      "std": 0.5,  # tolerates ~0.5 rad/s roll/pitch rate before significant penalty
     },
   ),
-  "angular_momentum": RewardTermCfg(
-    func=angular_momentum_penalty,
-    weight=-0.5,
-    params={"sensor_name": "root_angmom"},
-  ),
-  "dof_pos_limits": RewardTermCfg(
-    func=joint_pos_limits,
-    weight=-1.0
-  ),
-  "action_rate_l2": RewardTermCfg(
-    func=action_rate_l2,
-    weight=-0.1
-  ),
+
+  # With positive weight, incentivizes rapid foot lifting, exactly what we want during gait
   "air_time": RewardTermCfg(
     func=feet_air_time,
-    weight=0.25,
+    weight=1.0,
     params={
       "sensor_name": "feet_ground_contact",
       "threshold_min": 0.05,
-      "threshold_max": 0.5,
-      "command_name": "twist",
-      "command_threshold": 0.1,
-    },
-  ),
-  "feet_clearance": RewardTermCfg(
-    func=feet_clearance,
-    weight=-2.0,
-    params={
-      "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
-      "target_height": 0.025,  # cm
+      "threshold_max": 0.25,
       "command_name": "twist",
       "command_threshold": 0.05,
     },
   ),
-  "feet_swing_height": RewardTermCfg(
-    func=feet_swing_height,
-    weight=-0.25,
-    params={
-      "sensor_name": "feet_ground_contact",
-      "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
-      "target_height": 0.025,
-      "command_name": "twist",
-      "command_threshold": 0.05,
-    },
-  ),
+
   "foot_slip": RewardTermCfg(
     func=feet_slip,
-    weight=-0.25,
+    weight=-0.5,
     params={
       "sensor_name": "feet_ground_contact",
       "command_name": "twist",
@@ -138,24 +242,59 @@ rewards = {
       "asset_cfg": SceneEntityCfg("robot", site_names=CRAWLER_FOOT_SITE_NAMES),
     },
   ),
-  "soft_landing": RewardTermCfg(
-    func=soft_landing,  # Penalize high foot impact forces
-    weight=-0.25,
+
+  # Penalties: suppress bad behaviors without overriding the positive signal
+
+  # Discourages jerky, high-frequency joint commands.
+  "action_rate_l2": RewardTermCfg(
+    func=action_rate_l2,
+    weight=-0.1,
+  ),
+
+  # Discourages standing still
+  "stand_still": RewardTermCfg(
+    func=stand_still,
+    weight=-2.0,
     params={
-      "sensor_name": "feet_ground_contact",
       "command_name": "twist",
       "command_threshold": 0.05,
     },
   ),
+
+  # Penalize fast joint motion. Weight must be small enough that walking-speed
+  # joint velocities don't swamp the positive tracking signal.
+  # At 12 joints with typical walking vel ~2 rad/s each, raw L2 ~ 12*(2²) = 48.
+  # At -0.1 that's already -4.8 per step, which over an episode completely
+  # dominates the +4.0 tracking reward. For this reason we keep this term
+  # very small compared to others.
+  "joint_vel_l2": RewardTermCfg(
+    func=joint_vel_l2,
+    weight=-0.001,
+  ),
+
+  "is_terminated": RewardTermCfg(
+    func=is_terminated,
+    weight=-200.0
+  ),
+
   "self_collisions": RewardTermCfg(
     func=self_collision_cost,
-    weight=-0.5,
+    weight=-1.0,
     params={
       "sensor_name": "self_collision",
-      "force_threshold": 1.0
+      "force_threshold": 2.5
+    },
+  ),
+
+  "nonfeet_ground_contact": RewardTermCfg(
+    func=nonfeet_ground_contact,
+    weight=-0.5,
+    params={
+      "sensor_name": "nonfeet_ground_contact",
     },
   ),
 }
+
 
 """
 # Rationale for std values:

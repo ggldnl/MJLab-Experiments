@@ -33,7 +33,7 @@ FEET_GROUND_CONTACT_SENSOR = ContactSensorCfg(
   ),
   secondary=ContactMatch(
     mode="body",
-    pattern=r"terrain",
+    pattern="terrain",
   ),
   fields=("found", "force"),
   reduce="netforce",  #  all contact forces on a given primary geom are summed into a single net force vector
@@ -71,7 +71,7 @@ SELF_COLLISION_SENSOR = ContactSensorCfg(
     entity="robot",
   ),
   secondary=ContactMatch(
-    mode="body",
+    mode="geom",
     pattern=(
       *CRAWLER_FOOT_GEOM_NAMES,
       *CRAWLER_TIBIA_GEOM_NAMES,
@@ -96,8 +96,8 @@ TERRAIN_SCAN = RayCastSensorCfg(
   max_distance=5.0,
   include_geom_groups=(0,),  # terrain only
   exclude_parent_body=True,
-  debug_vis=True,
-  viz=RayCastSensorCfg.VizCfg(show_normals=True),
+  # debug_vis=True,
+  # viz=RayCastSensorCfg.VizCfg(show_normals=True),
 )
 
 # Angular momentum sensor (whole robot subtree from base)

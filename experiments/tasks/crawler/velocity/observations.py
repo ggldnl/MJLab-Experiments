@@ -28,36 +28,62 @@ from experiments.robots.crawler.constants import CRAWLER_FOOT_GEOM_NAMES
 from experiments.robots.crawler.sensors import TERRAIN_SCAN
 
 
-actor_terms = {
+# Number of past frames to stack for proprioceptive terms.
+# At 100 Hz with decimation=4, we have a 25 Hz policy,
+# so 10 frames = 400ms window, enough to observe
+# roughly one full stride cycle
+_PROPRIOCEPTIVE_HISTORY = 10
+
+actor_proprioceptive_terms = {
   "base_lin_vel": ObservationTermCfg(
-      func=builtin_sensor,
-      params={"sensor_name": "imu_lin_vel"},
-      noise=Unoise(n_min=-0.5, n_max=0.5),
-    ),
+    func=builtin_sensor,
+    params={"sensor_name": "imu_lin_vel"},
+    noise=Unoise(n_min=-0.5, n_max=0.5),
+    history_length=_PROPRIOCEPTIVE_HISTORY,
+  ),
   "base_ang_vel": ObservationTermCfg(
     func=builtin_sensor,
     params={"sensor_name": "imu_ang_vel"},
     noise=Unoise(n_min=-0.2, n_max=0.2),
+    history_length=_PROPRIOCEPTIVE_HISTORY,
   ),
+  # No history: gravity vector changes only when the robot tips, which is a
+  # slow signal; a single frame is sufficient
   "projected_gravity": ObservationTermCfg(
     func=projected_gravity,
     noise=Unoise(n_min=-0.05, n_max=0.05),
   ),
+  # Having joint positions across frames encode leg phase implicitly:
+  # the policy can infer whether each leg is mid-swing or mid-stance without
+  # a separate phase signal
   "joint_pos": ObservationTermCfg(
     func=joint_pos_rel,
     noise=Unoise(n_min=-0.01, n_max=0.01),
+    history_length=_PROPRIOCEPTIVE_HISTORY,
   ),
   "joint_vel": ObservationTermCfg(
     func=joint_vel_rel,
     noise=Unoise(n_min=-1.5, n_max=1.5),
+    history_length=_PROPRIOCEPTIVE_HISTORY,
   ),
+  # Past actions let the policy detect its own oscillation pattern
+  # and self-correct without needing an explicit oscillation penalty
   "actions": ObservationTermCfg(
-    func=last_action
+    func=last_action,
+    history_length=_PROPRIOCEPTIVE_HISTORY,
   ),
+  # No history: command is constant within a resampling window, stacking it`
+  # would just repeat the same vector n times and waste input dimensions
   "command": ObservationTermCfg(
     func=generated_commands,
     params={"command_name": "twist"},
   ),
+}
+
+actor_exteroceptive_terms = {
+  # No history: terrain geometry changes slowly relative to the stride cycle;
+  # the scan is also the largest term (many grid points), stacking it would
+  # inflate the input dimension significantly with no benefit
   "height_scan": ObservationTermCfg(
     func=height_scan,
     params={"sensor_name": "terrain_scan"},
@@ -66,10 +92,32 @@ actor_terms = {
   ),
 }
 
+actor_terms = {
+  **actor_proprioceptive_terms,
+  **actor_exteroceptive_terms
+}
+
 # Critic takes all the terms of the actor + observations from environment e.g. foot height, ...
+# Clean ground truth versions of the noisy actor terms. No history needed
+# since the critic sees exact state and doesn't need to infer trends
 
 critic_terms = {
   **actor_terms,
+  "true_base_lin_vel": ObservationTermCfg(
+    func=builtin_sensor,
+    params={"sensor_name": "imu_lin_vel"},
+    # Critic sees clean signal
+  ),
+  "true_base_ang_vel": ObservationTermCfg(
+    func=builtin_sensor,
+    params={"sensor_name": "imu_ang_vel"},
+  ),
+  "true_joint_pos": ObservationTermCfg(
+    func=joint_pos_rel,
+  ),
+  "true_joint_vel": ObservationTermCfg(
+    func=joint_vel_rel,
+  ),
   "height_scan": ObservationTermCfg(
     func=height_scan,
     params={"sensor_name": "terrain_scan"},
