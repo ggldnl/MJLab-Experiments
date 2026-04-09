@@ -77,7 +77,10 @@ def flat_orientation(
   std: float,
 ) -> torch.Tensor:
   """
-  Reward flat base orientation (robot being upright).
+  Reward flat base orientation (robot being upright) measuring the robot's current tilt angle.
+  It projects gravity into the body frame: if the robot is perfectly upright, gravity points
+  straight down in body frame and the x/y components are zero. If the robot is tilted, those
+  components grow. It's a position-domain signal.
   """
 
   asset = env.scene["robot"]
@@ -157,6 +160,7 @@ def base_stability(
   upright but still oscillating heavily.
   Uses a Gaussian so small wobble is tolerated and only large rates are
   penalized strongly.
+  It's a velocity-domain signal.
   """
 
   asset = env.scene["robot"]
@@ -173,65 +177,93 @@ rewards = {
 
   # Positive signals: define what the robot should do
 
-  # Velocity tracking is the primary objective; weights must dominate all penalties.
+  # Primary task: velocity tracking.
+  # Weights are high and stay high throughout training.
+  # std=0.25 m/s for linear: at command=0.1 m/s a stationary robot gets
+  # exp(-0.04/0.0625)=0.53, giving a meaningful gradient toward motion.
+  # std=0.2 rad/s for angular: same reasoning.
   "track_linear_velocity": RewardTermCfg(
     func=track_linear_velocity,
-    weight=4.0,
+    weight=5.0,
     params={
       "command_name": "twist",
-      "std": math.sqrt(0.25),
+      "std": 0.25,
     },
   ),
   "track_angular_velocity": RewardTermCfg(
     func=track_angular_velocity,
-    weight=4.0,
+    weight=5.0,
     params={
       "command_name": "twist",
-      "std": math.sqrt(0.5),
+      "std": 0.25,
     },
   ),
 
-  # Postural stability: keep the robot upright and at the right height.
-  "upright": RewardTermCfg(
-      func=flat_orientation,
-      weight=1.0,
-      params={
-          "std": math.sqrt(0.2),
-      },
-  ),
-
-  # Encourages the robot to keep a fixed base height
-  "base_height": RewardTermCfg(
-    func=base_height,
-    weight=1.0,
-    params={
-      "target_height": 0.02,
-      "std": 0.05,
-    },
-  ),
-
-  # Dynamic base stability: penalizes roll and pitch angular velocity
-  "base_stability": RewardTermCfg(
-    func=base_stability,
-    weight=-1.0,
-    params={
-      "std": 0.5,  # tolerates ~0.5 rad/s roll/pitch rate before significant penalty
-    },
-  ),
-
+  # Gait quality: reward foot air time to encourage leg lifting.
+  # Introduced from the start at low weight; keeps the robot from shuffling.
   # With positive weight, incentivizes rapid foot lifting, exactly what we want during gait
   "air_time": RewardTermCfg(
     func=feet_air_time,
-    weight=1.0,
+    weight=0.5,
     params={
       "sensor_name": "feet_ground_contact",
       "threshold_min": 0.05,
-      "threshold_max": 0.25,
+      "threshold_max": 0.5,
       "command_name": "twist",
       "command_threshold": 0.05,
     },
   ),
 
+  # Posture: upright orientation.
+  # std=0.5 rad (~28 deg): tolerates normal walking lean.
+  # Weight starts at 0, introduced by curriculum once the robot walks.
+  "upright": RewardTermCfg(
+    func=flat_orientation,
+    weight=0.0,  # enabled by curriculum at _S1
+    params={
+      "std": 0.5,
+    },
+  ),
+
+  # Posture: base height.
+  # std=0.015 m (15mm): tolerates terrain bounce, penalizes collapse.
+  # Weight starts at 0, introduced by curriculum once the robot walks.
+  "base_height": RewardTermCfg(
+    func=base_height,
+    weight=0.0,  # enabled by curriculum at _S1
+    params={
+      "target_height": 0.02,
+      "std": 0.015,
+    },
+  ),
+
+  # Posture: dynamic base stability (roll/pitch rate).
+  # std=0.3 rad/s: tolerates smooth gait, penalizes stumbling.
+  # Weight starts at 0, introduced by curriculum after posture is established.
+  "base_stability": RewardTermCfg(
+    func=base_stability,
+    weight=0.0,  # enabled by curriculum at _S2
+    params={
+      "std": 0.5,  # tolerates ~0.5 rad/s roll/pitch rate before significant penalty
+    },
+  ),
+
+  # Penalties: suppress bad behaviors without overriding the positive signal
+
+  # Penalties: always active from the start.
+
+  # Discourages standing still when commanded to move.
+  "stand_still": RewardTermCfg(
+    func=stand_still,
+    weight=-2.0,
+    params={
+      "command_name": "twist",
+      "command_threshold": 0.05,
+      "std": 0.05,
+    },
+  ),
+
+  # Penalizes foot sliding during stance.
   "foot_slip": RewardTermCfg(
     func=feet_slip,
     weight=-0.5,
@@ -243,22 +275,10 @@ rewards = {
     },
   ),
 
-  # Penalties: suppress bad behaviors without overriding the positive signal
-
-  # Discourages jerky, high-frequency joint commands.
+  # Discourages jerky joint commands.
   "action_rate_l2": RewardTermCfg(
     func=action_rate_l2,
-    weight=-0.1,
-  ),
-
-  # Discourages standing still
-  "stand_still": RewardTermCfg(
-    func=stand_still,
-    weight=-2.0,
-    params={
-      "command_name": "twist",
-      "command_threshold": 0.05,
-    },
+    weight=0.0,
   ),
 
   # Penalize fast joint motion. Weight must be small enough that walking-speed
@@ -269,23 +289,26 @@ rewards = {
   # very small compared to others.
   "joint_vel_l2": RewardTermCfg(
     func=joint_vel_l2,
-    weight=-0.001,
+    weight=0.0,
   ),
 
+  # Hard termination penalty.
   "is_terminated": RewardTermCfg(
     func=is_terminated,
-    weight=-200.0
+    weight=-200.0,
   ),
 
+  # Penalizes self-collision.
   "self_collisions": RewardTermCfg(
     func=self_collision_cost,
     weight=-1.0,
     params={
       "sensor_name": "self_collision",
-      "force_threshold": 2.5
+      "force_threshold": 2.5,
     },
   ),
 
+  # Penalizes non-foot body parts touching the terrain.
   "nonfeet_ground_contact": RewardTermCfg(
     func=nonfeet_ground_contact,
     weight=-0.5,
@@ -294,7 +317,6 @@ rewards = {
     },
   ),
 }
-
 
 """
 # Rationale for std values:

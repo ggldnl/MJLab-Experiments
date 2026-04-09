@@ -30,8 +30,6 @@ from mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_run
 from mjlab.utils.os import dump_yaml, get_checkpoint_path
 from mjlab.utils.torch import configure_torch_backends
 
-from experiments.utils.video_logger import RunnerWithEvalVideo, EvalVideoLogger
-
 import experiments.tasks  # noqa: F401 - triggers _auto_import_submodules, populates registry
 
 
@@ -42,8 +40,12 @@ class WandbConfig:
     entity: str | None = None
     group: str | None = None  # defaults to task_id when None
     log_interval: int = 1
-    eval_video_interval: int = 500
-    eval_video_length: int = 200
+
+    # TODO add video logging
+    log_video: bool = True
+    video_fps: int = 30
+    video_length_seconds: float = 3.0
+    video_frequency: int = 20
 
 
 @dataclass(frozen=True)
@@ -117,18 +119,9 @@ def run_train(task_id: str, cfg: TrainConfig) -> None:
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
     # Use eval-video runner subclass when wandb + a non-zero interval are both enabled
-    use_eval_video = cfg.wandb.enabled and cfg.wandb.eval_video_interval > 0
-    runner_cls = load_runner_cls(task_id) or (RunnerWithEvalVideo if use_eval_video else MjlabOnPolicyRunner)
+    runner_cls = load_runner_cls(task_id) or MjlabOnPolicyRunner
     runner = runner_cls(env, asdict(agent_cfg), str(run_dir), device)
     runner.add_git_repo_to_log(__file__)
-
-    if use_eval_video and isinstance(runner, RunnerWithEvalVideo):
-        runner.eval_video_logger = EvalVideoLogger(
-            env_cfg=env_cfg,
-            device=device,
-            video_length=cfg.wandb.eval_video_length,
-            interval=cfg.wandb.eval_video_interval,
-        )
 
     dump_yaml(run_dir / "params" / "env.yaml", asdict(env_cfg))
     dump_yaml(run_dir / "params" / "agent.yaml", asdict(agent_cfg))

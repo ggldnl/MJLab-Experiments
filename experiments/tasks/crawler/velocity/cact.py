@@ -25,7 +25,7 @@ from mjlab.managers import CommandTermCfg
 from mjlab.managers.action_manager import ActionTermCfg
 from mjlab.managers.curriculum_manager import CurriculumTermCfg
 from mjlab.managers.termination_manager import TerminationTermCfg
-from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg, reward_weight
 from mjlab.tasks.velocity.mdp.curriculums import commands_vel
 
 from experiments.robots.crawler.actuators import CRAWLER_ACTION_SCALES
@@ -58,6 +58,21 @@ actions: dict[str, ActionTermCfg] = {
   )
 }
 
+
+# Curriculum
+# steps_per_iteration = common_step_counter / iterations
+# steps_per_iteration_per_env = steps_per_iteration / num_envs
+#
+# _STEPS_PER_ITER = _TOTAL_STEPS_AT_ITER_X / _ITER_X  # measure from logs
+# _Sx = y * _STEPS_PER_ITER  # at iteration y we trigger something
+# _TOTAL_STEPS_AT_ITER_X = 4964352
+# _ITER_X = 100
+# _STEPS_PER_ITER = _TOTAL_STEPS_AT_ITER_X / _ITER_X = 49643 ~ 50k
+
+_S1 = 600
+_S2 = 1000
+_S3 = 2000
+
 curriculum = {
   "command_vel": CurriculumTermCfg(
     func=commands_vel,
@@ -66,22 +81,103 @@ curriculum = {
       "velocity_stages": [
         {
           "step": 0,
-          "lin_vel_x": (-0.25, 0.25),  # comfortable walking range
-          "lin_vel_y": (-0.25, 0.25),
-          "ang_vel_z": (-0.2, 0.2),
+          "lin_vel_x": (-0.18, 0.18),  # comfortable
+          "lin_vel_y": (-0.18, 0.18),
+          "ang_vel_z": (-0.1, 0.1),
         },
         {
-          "step": 5000 * 24,
-          "lin_vel_x": (-0.5, 0.5),  # nominal trot
+          "step": _S1,
+          "lin_vel_x": (-0.25, 0.25),
+          "lin_vel_y": (-0.25, 0.25),
+          "ang_vel_z": (-0.15, 0.15),
+        },
+        {
+          "step": _S2,
+          "lin_vel_x": (-0.5, 0.5),  # aggressive
           "lin_vel_y": (-0.5, 0.5),
           "ang_vel_z": (-0.4, 0.4),
         },
-        {
-          "step": 10000 * 24,
-          "lin_vel_x": (-0.8, 0.8),  # aggressive, near physical ceiling
-          "lin_vel_y": (-0.8, 0.8),
-          "ang_vel_z": (-0.5, 0.5),
-        },
+      ],
+    },
+  ),
+
+  # Curriculum weighting for standing still
+  "w_stand_still": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "stand_still",
+      "weight_stages": [
+        {"step": 0, "weight": -2.0},
+        {"step": _S1, "weight": -1.0},
+        {"step": _S2, "weight": -0.5},
+      ],
+    },
+  ),
+
+  "w_joint_vel_l2": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "stand_still",
+      "weight_stages": [
+        {"step": 0, "weight": 0.0},
+        {"step": _S1, "weight": -0.001},
+        {"step": _S2, "weight": -0.005},
+      ],
+    },
+  ),
+
+  "w_action_rate_l2": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "action_rate_l2",
+      "weight_stages": [
+        {"step": 0, "weight": 0.0},
+        {"step": _S1, "weight": -0.5},
+        {"step": _S2, "weight": -1.0},
+      ],
+    },
+  ),
+
+  # Introduce upright orientation reward once basic locomotion exists.
+  # Low weight at first so it shapes without dominating velocity tracking.
+  "w_upright": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "upright",
+      "weight_stages": [
+        {"step": 0, "weight": 0.5},
+        {"step": _S1, "weight": 1.0},
+        {"step": _S2, "weight": 1.5},
+        {"step": _S3, "weight": 2.0},
+      ],
+    },
+  ),
+
+  # Base height reward
+  "w_base_height": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "base_height",
+      "weight_stages": [
+        {"step": 0, "weight": 0.5},
+        {"step": _S1, "weight": 1.0},
+        {"step": _S2, "weight": 1.5},
+        {"step": _S3, "weight": 2.0},
+      ],
+    },
+  ),
+
+  # Introduce dynamic stability only after posture rewards have had time to
+  # establish a stable base. Too early and it fights locomotion exploration.
+  "w_base_stability": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "base_stability",
+      "weight_stages": [
+        {"step": 0, "weight": -0.5},
+        {"step": _S1, "weight": -1.0},
+        {"step": _S2, "weight": -1.5},
+        {"step": _S3, "weight": -2.0},
       ],
     },
   ),
