@@ -69,9 +69,9 @@ actions: dict[str, ActionTermCfg] = {
 # _ITER_X = 100
 # _STEPS_PER_ITER = _TOTAL_STEPS_AT_ITER_X / _ITER_X = 49643 ~ 50k
 
-_S1 = 600
-_S2 = 1000
-_S3 = 2000
+_S1 = 1000
+_S2 = 2500
+_S3 = 5000
 
 curriculum = {
   "command_vel": CurriculumTermCfg(
@@ -101,42 +101,7 @@ curriculum = {
     },
   ),
 
-  # Curriculum weighting for standing still
-  "w_stand_still": CurriculumTermCfg(
-    func=reward_weight,
-    params={
-      "reward_name": "stand_still",
-      "weight_stages": [
-        {"step": 0, "weight": -2.0},
-        {"step": _S1, "weight": -1.0},
-        {"step": _S2, "weight": -0.5},
-      ],
-    },
-  ),
-
-  "w_joint_vel_l2": CurriculumTermCfg(
-    func=reward_weight,
-    params={
-      "reward_name": "stand_still",
-      "weight_stages": [
-        {"step": 0, "weight": 0.0},
-        {"step": _S1, "weight": -0.001},
-        {"step": _S2, "weight": -0.005},
-      ],
-    },
-  ),
-
-  "w_action_rate_l2": CurriculumTermCfg(
-    func=reward_weight,
-    params={
-      "reward_name": "action_rate_l2",
-      "weight_stages": [
-        {"step": 0, "weight": 0.0},
-        {"step": _S1, "weight": -0.5},
-        {"step": _S2, "weight": -1.0},
-      ],
-    },
-  ),
+  # Phase 2: once the robot walks, teach it to walk upright
 
   # Introduce upright orientation reward once basic locomotion exists.
   # Low weight at first so it shapes without dominating velocity tracking.
@@ -145,10 +110,10 @@ curriculum = {
     params={
       "reward_name": "upright",
       "weight_stages": [
-        {"step": 0, "weight": 0.5},
-        {"step": _S1, "weight": 1.0},
-        {"step": _S2, "weight": 1.5},
-        {"step": _S3, "weight": 2.0},
+        {"step": 0, "weight": 0.0},
+        {"step": _S1, "weight": 0.5},
+        {"step": _S2, "weight": 1.0},
+        {"step": _S3, "weight": 1.5},
       ],
     },
   ),
@@ -159,13 +124,15 @@ curriculum = {
     params={
       "reward_name": "base_height",
       "weight_stages": [
-        {"step": 0, "weight": 0.5},
-        {"step": _S1, "weight": 1.0},
-        {"step": _S2, "weight": 1.5},
-        {"step": _S3, "weight": 2.0},
+        {"step": 0, "weight": 0.0},
+        {"step": _S1, "weight": 0.5},
+        {"step": _S2, "weight": 1.0},
+        {"step": _S3, "weight": 1.5},
       ],
     },
   ),
+
+  # Phase 3: stability and gait quality (only after posture)
 
   # Introduce dynamic stability only after posture rewards have had time to
   # establish a stable base. Too early and it fights locomotion exploration.
@@ -174,10 +141,76 @@ curriculum = {
     params={
       "reward_name": "base_stability",
       "weight_stages": [
+        {"step": 0, "weight": 0.0},
+        {"step": _S2, "weight": -0.5},
+        {"step": _S3, "weight": -1.0},
+      ],
+    },
+  ),
+
+  # Phase 4: smoothness, fights exploration if introduced early
+
+  "w_joint_vel_l2": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "joint_vel_l2",
+      "weight_stages": [
+        {"step": 0, "weight": 0.0},
+        {"step": _S2, "weight": -0.001},
+        {"step": _S3, "weight": -0.005},
+      ],
+    },
+  ),
+
+  # Penalizes the change in action between consecutive steps
+  "w_action_rate_l2": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "action_rate_l2",
+      "weight_stages": [
+        {"step": 0, "weight": -0.05},
+        {"step": _S2, "weight": -0.2},
+        {"step": _S3, "weight": -0.5},
+      ],
+    },
+  ),
+
+  # Misc
+
+  # stand_still: relax gradually but never to zero
+  "w_stand_still": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "stand_still",
+      "weight_stages": [
         {"step": 0, "weight": -0.5},
         {"step": _S1, "weight": -1.0},
-        {"step": _S2, "weight": -1.5},
-        {"step": _S3, "weight": -2.0},
+        {"step": _S2, "weight": -2.0},
+      ],
+    },
+  ),
+
+  # foot_slip: increase gradually, some slip needed (e.g. stance phase)
+  "w_foot_slip": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "foot_slip",
+      "weight_stages": [
+        {"step": 0,   "weight": 0.0},
+        {"step": _S1, "weight": -0.3},
+        {"step": _S2, "weight": -0.5},
+      ],
+    },
+  ),
+
+  "w_nonfeet_ground_contact": CurriculumTermCfg(
+    func=reward_weight,
+    params={
+      "reward_name": "nonfeet_ground_contact",
+      "weight_stages": [
+        {"step": 0,   "weight": -0.5},
+        {"step": _S1, "weight": -1.0},
+        {"step": _S2, "weight": -2.0},
       ],
     },
   ),
@@ -257,7 +290,7 @@ terminations = {
   ),
   "fell_over": TerminationTermCfg(
     func=bad_orientation,
-    params={"limit_angle": math.radians(70.0)},
+    params={"limit_angle": math.radians(90.0)},
   ),
   "stand_still": TerminationTermCfg(
     func=stand_still_termination,

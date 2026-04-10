@@ -177,6 +177,8 @@ rewards = {
 
   # Positive signals: define what the robot should do
 
+  # Phase 1: robot must learn to move and explore different strategies
+
   # Primary task: velocity tracking.
   # Weights are high and stay high throughout training.
   # std=0.25 m/s for linear: at command=0.1 m/s a stationary robot gets
@@ -192,16 +194,34 @@ rewards = {
   ),
   "track_angular_velocity": RewardTermCfg(
     func=track_angular_velocity,
-    weight=5.0,
+    weight=2.0,  # lower than linear, yaw is secondary
     params={
       "command_name": "twist",
       "std": 0.25,
     },
   ),
 
-  # Gait quality: reward foot air time to encourage leg lifting.
-  # Introduced from the start at low weight; keeps the robot from shuffling.
-  # With positive weight, incentivizes rapid foot lifting, exactly what we want during gait
+  # Penalizes non-foot body parts touching the terrain.
+  "nonfeet_ground_contact": RewardTermCfg(
+    func=nonfeet_ground_contact,
+    weight=-0.5,
+    params={
+      "sensor_name": "nonfeet_ground_contact",
+    },
+  ),
+
+  # Discourages standing still when commanded to move.
+  "stand_still": RewardTermCfg(
+    func=stand_still,
+    weight=-3.0,
+    params={
+      "command_name": "twist",
+      "command_threshold": 0.05,
+      "std": 0.2,
+    },
+  ),
+
+  # With positive weight, incentivizes foot lifting, exactly what we want during gait
   "air_time": RewardTermCfg(
     func=feet_air_time,
     weight=0.5,
@@ -214,26 +234,38 @@ rewards = {
     },
   ),
 
+  # Hard termination penalty.
+  "is_terminated": RewardTermCfg(
+    func=is_terminated,
+    weight=-200.0,
+  ),
+
+  # Everything else starts from 0 and gets enabled by the curriculum
+  # Phase 1: Robot must move (only velocity + termination active)
+  # Phase 2: Robot must move well (gait quality added)
+  # Phase 3: Robot must move well and look good (posture added)
+  # Phase 4: Robot must move well, look good, and be efficient (smoothness added)
+
   # Posture: upright orientation.
   # std=0.5 rad (~28 deg): tolerates normal walking lean.
   # Weight starts at 0, introduced by curriculum once the robot walks.
   "upright": RewardTermCfg(
     func=flat_orientation,
-    weight=0.0,  # enabled by curriculum at _S1
+    weight=0.0,
     params={
       "std": 0.5,
     },
   ),
 
   # Posture: base height.
-  # std=0.015 m (15mm): tolerates terrain bounce, penalizes collapse.
+  # std=0.025 m (25 mm): tolerates terrain bounce, penalizes collapse.
   # Weight starts at 0, introduced by curriculum once the robot walks.
   "base_height": RewardTermCfg(
     func=base_height,
-    weight=0.0,  # enabled by curriculum at _S1
+    weight=0.0,
     params={
-      "target_height": 0.02,
-      "std": 0.015,
+      "target_height": 0.035,  # 3/4 cm from the ground
+      "std": 0.025,
     },
   ),
 
@@ -242,31 +274,16 @@ rewards = {
   # Weight starts at 0, introduced by curriculum after posture is established.
   "base_stability": RewardTermCfg(
     func=base_stability,
-    weight=0.0,  # enabled by curriculum at _S2
+    weight=0.0,
     params={
       "std": 0.5,  # tolerates ~0.5 rad/s roll/pitch rate before significant penalty
-    },
-  ),
-
-  # Penalties: suppress bad behaviors without overriding the positive signal
-
-  # Penalties: always active from the start.
-
-  # Discourages standing still when commanded to move.
-  "stand_still": RewardTermCfg(
-    func=stand_still,
-    weight=-2.0,
-    params={
-      "command_name": "twist",
-      "command_threshold": 0.05,
-      "std": 0.05,
     },
   ),
 
   # Penalizes foot sliding during stance.
   "foot_slip": RewardTermCfg(
     func=feet_slip,
-    weight=-0.5,
+    weight=0.0,
     params={
       "sensor_name": "feet_ground_contact",
       "command_name": "twist",
@@ -278,7 +295,7 @@ rewards = {
   # Discourages jerky joint commands.
   "action_rate_l2": RewardTermCfg(
     func=action_rate_l2,
-    weight=0.0,
+    weight=-0.05,
   ),
 
   # Penalize fast joint motion. Weight must be small enough that walking-speed
@@ -292,28 +309,13 @@ rewards = {
     weight=0.0,
   ),
 
-  # Hard termination penalty.
-  "is_terminated": RewardTermCfg(
-    func=is_terminated,
-    weight=-200.0,
-  ),
-
   # Penalizes self-collision.
   "self_collisions": RewardTermCfg(
     func=self_collision_cost,
-    weight=-1.0,
+    weight=0.0,
     params={
       "sensor_name": "self_collision",
       "force_threshold": 2.5,
-    },
-  ),
-
-  # Penalizes non-foot body parts touching the terrain.
-  "nonfeet_ground_contact": RewardTermCfg(
-    func=nonfeet_ground_contact,
-    weight=-0.5,
-    params={
-      "sensor_name": "nonfeet_ground_contact",
     },
   ),
 }
