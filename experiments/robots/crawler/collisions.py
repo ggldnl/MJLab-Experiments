@@ -22,7 +22,7 @@ CRAWLER_COLLISIONS = CollisionCfg(
     priority=1,
     friction=(CRAWLER_FOOT_MATERIAL_FRICTION_COEFFICIENT,),
     solimp={
-        _foot_geom_regex: (0.015, 1, 0.03),  # soft landing on feet
+        _foot_geom_regex: (0.9, 0.95, 0.005),  # soft landing on feet
         _tibia_geom_regex: (0.9, 0.95, 0.01),  # stiffer, minimal softness on tibia
     },
 )

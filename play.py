@@ -22,8 +22,8 @@ class PlayConfig:
     viewer: Literal["native", "viser"] = "viser"
     video: bool = False
     video_length: int = 500
-    video_height: int | None = None
-    video_width: int | None = None
+    video_height: int | None = 1080
+    video_width: int | None = 1920
     video_dir: Path = Path("videos", "rsl_rl")
     logs_dir: Path = Path("logs", "rsl_rl")
 

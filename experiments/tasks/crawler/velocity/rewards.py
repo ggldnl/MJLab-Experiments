@@ -117,17 +117,31 @@ def stand_still(
   env: ManagerBasedRlEnv,
   command_name: str,
   command_threshold: float = 0.05,
-  std: float = 0.1,
+  std: float = 0.05,            # meters, not rad/s — tighter now
+  window_steps: int = 20,       # ~0.2s rolling window
 ) -> torch.Tensor:
-  """
-  Penalize the robot standing still.
-  """
+  # Lazily init short-window anchor for reward
+  if not hasattr(env, "_stand_still_anchor"):
+    asset = env.scene["robot"]
+    env._stand_still_anchor = asset.data.root_link_pos_w[:, :2].clone()
+    env._stand_still_anchor_step = torch.zeros(
+      env.num_envs, dtype=torch.long, device=env.device
+    )
 
   asset = env.scene["robot"]
+  current_pos = asset.data.root_link_pos_w[:, :2]
+  current_step = env.episode_length_buf
 
-  # Measure actual world-space motion, not joint displacement
-  speed = torch.norm(asset.data.root_link_vel_w[:, :2], dim=1)
-  stillness = torch.exp(-speed / std)  # near 1.0 when not translating
+  new_episode = current_step <= 1
+  env._stand_still_anchor[new_episode] = current_pos[new_episode]
+  env._stand_still_anchor_step[new_episode] = 0
+
+  refresh = (current_step - env._stand_still_anchor_step) >= window_steps
+  env._stand_still_anchor[refresh] = current_pos[refresh]
+  env._stand_still_anchor_step[refresh] = current_step[refresh]
+
+  net_displacement = torch.norm(current_pos - env._stand_still_anchor, dim=1)
+  stillness = torch.exp(-net_displacement / std)  # near 1.0 when not actually moving
 
   command = env.command_manager.get_command(command_name)
   total_command = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
@@ -170,7 +184,7 @@ def base_stability(
   roll_pitch_vel = asset.data.root_link_vel_w[:, 3:5]  # [B, 2]
   wobble_sq = torch.sum(roll_pitch_vel ** 2, dim=1)  # [B]
 
-  return torch.exp(-wobble_sq / std**2) - 1.0  # 0.0 when still, -1.0 at large wobble
+  return torch.exp(-wobble_sq / std**2)  # 1.0 when still, 0.0 at large wobble
 
 
 rewards = {
@@ -228,7 +242,7 @@ rewards = {
     params={
       "sensor_name": "feet_ground_contact",
       "threshold_min": 0.05,
-      "threshold_max": 0.5,
+      "threshold_max": 0.3,
       "command_name": "twist",
       "command_threshold": 0.05,
     },
@@ -270,8 +284,9 @@ rewards = {
   ),
 
   # Posture: dynamic base stability (roll/pitch rate).
-  # std=0.3 rad/s: tolerates smooth gait, penalizes stumbling.
+  # std=0.5 rad/s: tolerates smooth gait, penalizes stumbling.
   # Weight starts at 0, introduced by curriculum after posture is established.
+  # This is a velocity-domain signal and only penalizes dynamical wobbling.
   "base_stability": RewardTermCfg(
     func=base_stability,
     weight=0.0,
@@ -280,7 +295,7 @@ rewards = {
     },
   ),
 
-  # Penalizes foot sliding during stance.
+  # Penalizes foot sliding.
   "foot_slip": RewardTermCfg(
     func=feet_slip,
     weight=0.0,
