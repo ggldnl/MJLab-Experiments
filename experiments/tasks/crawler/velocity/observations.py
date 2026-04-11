@@ -25,9 +25,11 @@ from mjlab.tasks.velocity.mdp.observations import (
 )
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 import torch
+import math
 
 from experiments.robots.crawler.constants import CRAWLER_FOOT_GEOM_NAMES
 from experiments.robots.crawler.sensors import TERRAIN_SCAN
+
 
 
 # Number of past frames to stack for proprioceptive terms.
@@ -35,6 +37,13 @@ from experiments.robots.crawler.sensors import TERRAIN_SCAN
 # so 10 frames = 400ms window, enough to observe
 # roughly one full stride cycle
 _PROPRIOCEPTIVE_HISTORY = 10
+
+# Amplitudes tuned to produce a visible but conservative stride.
+# Coxa swings the leg forward/back, femur lifts, tibia follows.
+_AMP_COXA  = 0.25  # rad
+_AMP_FEMUR = 0.20
+_AMP_TIBIA = 0.30
+
 
 # Four legs, diagonal pairs offset by pi so legs 0/1 and 2/3 are anti-phase.
 # This directly encodes a trot pattern into the input space.
@@ -60,6 +69,30 @@ def gait_phase_clock(
 
   # sin and cos together encode both phase and rate without discontinuity
   return torch.cat([torch.sin(phases), torch.cos(phases)], dim=1)  # [B, 8]
+
+
+def gait_residual(
+  env: ManagerBasedRlEnv,
+) -> torch.Tensor:
+  """
+  Returns a [B, 12] reference joint trajectory for a trot gait.
+  Used as the action mean so the policy outputs residuals on top of it.
+  Requires _phase_clock to already exist (created by gait_phase_clock obs).
+  """
+
+  if not hasattr(env, "_phase_clock"):
+    return torch.zeros(env.num_envs, 12, device=env.device)
+
+  offsets = _LEG_PHASE_OFFSETS.to(env.device)
+  phases = env._phase_clock.unsqueeze(1) + offsets.unsqueeze(0)  # [B, 4]
+
+  coxa  = _AMP_COXA  * torch.sin(phases)           # [B, 4]
+  femur = _AMP_FEMUR * torch.sin(phases + math.pi / 2)
+  tibia = _AMP_TIBIA * torch.sin(phases + math.pi)
+
+  # Interleave: [coxa_1, femur_1, tibia_1, coxa_2, ...]
+  ref = torch.stack([coxa, femur, tibia], dim=2).reshape(env.num_envs, 12)  # [B, 12]
+  return ref
 
 
 actor_proprioceptive_terms = {
@@ -110,6 +143,10 @@ actor_proprioceptive_terms = {
   "gait_phase": ObservationTermCfg(
     func=gait_phase_clock,
     params={"frequency": 1.5},
+  ),
+  # Tells the policy how much to move
+  "gait_residual": ObservationTermCfg(
+    func=gait_residual,
   ),
 }
 
