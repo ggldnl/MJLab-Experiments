@@ -208,7 +208,7 @@ rewards = {
   ),
   "track_angular_velocity": RewardTermCfg(
     func=track_angular_velocity,
-    weight=2.0,  # lower than linear, yaw is secondary
+    weight=3.0,  # lower than linear, yaw is secondary
     params={
       "command_name": "twist",
       "std": 0.25,
@@ -218,7 +218,7 @@ rewards = {
   # Penalizes non-foot body parts touching the terrain.
   "nonfeet_ground_contact": RewardTermCfg(
     func=nonfeet_ground_contact,
-    weight=-0.5,
+    weight=0.0,  # curriculum
     params={
       "sensor_name": "nonfeet_ground_contact",
     },
@@ -227,7 +227,7 @@ rewards = {
   # Discourages standing still when commanded to move.
   "stand_still": RewardTermCfg(
     func=stand_still,
-    weight=-3.0,
+    weight=0.0,  # curriculum
     params={
       "command_name": "twist",
       "command_threshold": 0.05,
@@ -265,7 +265,7 @@ rewards = {
   # Weight starts at 0, introduced by curriculum once the robot walks.
   "upright": RewardTermCfg(
     func=flat_orientation,
-    weight=0.0,
+    weight=0.0,  # curriculum
     params={
       "std": 0.5,
     },
@@ -276,7 +276,7 @@ rewards = {
   # Weight starts at 0, introduced by curriculum once the robot walks.
   "base_height": RewardTermCfg(
     func=base_height,
-    weight=0.0,
+    weight=0.0,  # curriculum
     params={
       "target_height": 0.035,  # 3/4 cm from the ground
       "std": 0.025,
@@ -288,7 +288,7 @@ rewards = {
   # Weight starts at 0, introduced by curriculum after posture is established.
   # This is a velocity-domain signal and only penalizes dynamical wobbling.
   "base_stability": RewardTermCfg(
-    func=base_stability,
+    func=base_stability,  # curriculum
     weight=0.0,
     params={
       "std": 0.5,  # tolerates ~0.5 rad/s roll/pitch rate before significant penalty
@@ -298,7 +298,7 @@ rewards = {
   # Penalizes foot sliding.
   "foot_slip": RewardTermCfg(
     func=feet_slip,
-    weight=0.0,
+    weight=0.0,  # curriculum
     params={
       "sensor_name": "feet_ground_contact",
       "command_name": "twist",
@@ -310,7 +310,7 @@ rewards = {
   # Discourages jerky joint commands.
   "action_rate_l2": RewardTermCfg(
     func=action_rate_l2,
-    weight=-0.05,
+    weight=-0.05,  # curriculum
   ),
 
   # Penalize fast joint motion. Weight must be small enough that walking-speed
@@ -321,13 +321,13 @@ rewards = {
   # very small compared to others.
   "joint_vel_l2": RewardTermCfg(
     func=joint_vel_l2,
-    weight=0.0,
+    weight=0.0,  # curriculum
   ),
 
   # Penalizes self-collision.
   "self_collisions": RewardTermCfg(
     func=self_collision_cost,
-    weight=0.0,
+    weight=-1.0,
     params={
       "sensor_name": "self_collision",
       "force_threshold": 2.5,

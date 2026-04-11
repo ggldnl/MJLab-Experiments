@@ -93,7 +93,7 @@ curriculum = {
     },
   ),
 
-  # Phase 1 -> 2: behavioural penalties ramp together with the first
+  # Phase 1 -> 2: behavioral penalties ramp together with the first
   # velocity expansion, so the harder task comes with stricter rules
 
   # stand_still: relax gradually but never to zero
@@ -102,10 +102,9 @@ curriculum = {
     params={
       "reward_name": "stand_still",
       "weight_stages": [
-        {"step": _S0, "weight": -0.5},
-        {"step": _S1, "weight": -1.0},
-        {"step": _S3, "weight": -1.5},
-        {"step": _S4, "weight": -2.0},
+        {"step": _S0, "weight": 0.0},
+        {"step": _S3, "weight": -1.0},
+        {"step": _S4, "weight": -1.5},
       ],
     },
   ),

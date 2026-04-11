@@ -14,6 +14,7 @@ from mjlab.envs.mdp.observations import (
   projected_gravity,
   height_scan
 )
+from mjlab.envs import ManagerBasedRlEnv
 from mjlab.managers import SceneEntityCfg
 from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
 from mjlab.tasks.velocity.mdp.observations import (
@@ -23,6 +24,7 @@ from mjlab.tasks.velocity.mdp.observations import (
   foot_height
 )
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
+import torch
 
 from experiments.robots.crawler.constants import CRAWLER_FOOT_GEOM_NAMES
 from experiments.robots.crawler.sensors import TERRAIN_SCAN
@@ -33,6 +35,32 @@ from experiments.robots.crawler.sensors import TERRAIN_SCAN
 # so 10 frames = 400ms window, enough to observe
 # roughly one full stride cycle
 _PROPRIOCEPTIVE_HISTORY = 10
+
+# Four legs, diagonal pairs offset by pi so legs 0/1 and 2/3 are anti-phase.
+# This directly encodes a trot pattern into the input space.
+_LEG_PHASE_OFFSETS = torch.tensor([0.0, torch.pi, 0.0, torch.pi])
+
+def gait_phase_clock(
+  env: ManagerBasedRlEnv,
+  frequency: float = 1.5,  # Hz, roughly one stride per second
+) -> torch.Tensor:
+  # Advance a per-env phase counter lazily
+  if not hasattr(env, "_phase_clock"):
+    env._phase_clock = torch.zeros(env.num_envs, device=env.device)
+
+  # Reset on new episode
+  env._phase_clock[env.episode_length_buf <= 1] = 0.0
+
+  dt = env.physics_dt * env.cfg.decimation  # policy dt
+  env._phase_clock += 2.0 * torch.pi * frequency * dt
+
+  # [B, 4] per-leg phases: diagonal pair offset by pi
+  offsets = _LEG_PHASE_OFFSETS.to(env.device)
+  phases = env._phase_clock.unsqueeze(1) + offsets.unsqueeze(0)  # [B, 4]
+
+  # sin and cos together encode both phase and rate without discontinuity
+  return torch.cat([torch.sin(phases), torch.cos(phases)], dim=1)  # [B, 8]
+
 
 actor_proprioceptive_terms = {
   "base_lin_vel": ObservationTermCfg(
@@ -77,6 +105,11 @@ actor_proprioceptive_terms = {
   "command": ObservationTermCfg(
     func=generated_commands,
     params={"command_name": "twist"},
+  ),
+  # Tells the policy when to move
+  "gait_phase": ObservationTermCfg(
+    func=gait_phase_clock,
+    params={"frequency": 1.5},
   ),
 }
 
