@@ -12,7 +12,7 @@ from mjlab.envs.mdp.observations import (
   joint_vel_rel,
   last_action,
   projected_gravity,
-  height_scan
+  height_scan,
 )
 from mjlab.envs import ManagerBasedRlEnv
 from mjlab.managers import SceneEntityCfg
@@ -21,7 +21,7 @@ from mjlab.tasks.velocity.mdp.observations import (
   foot_air_time,
   foot_contact,
   foot_contact_forces,
-  foot_height
+  foot_height,
 )
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 import torch
@@ -31,129 +31,84 @@ from experiments.robots.crawler.constants import CRAWLER_FOOT_GEOM_NAMES
 from experiments.robots.crawler.sensors import TERRAIN_SCAN
 
 
+# At 100 Hz / decimation 4 = 25 Hz policy. 10 frames = 400 ms,
+# enough to observe roughly one full stride cycle.
+_HISTORY = 10
 
-# Number of past frames to stack for proprioceptive terms.
-# At 100 Hz with decimation=4, we have a 25 Hz policy,
-# so 10 frames = 400ms window, enough to observe
-# roughly one full stride cycle
-_PROPRIOCEPTIVE_HISTORY = 10
+# Diagonal-pair trot offsets: legs 0 and 2 are in phase, legs 1 and 3 are anti-phase.
+# To use a different gait (walk, bound), change these offsets only — nothing else.
+_LEG_PHASE_OFFSETS = torch.tensor([0.0, math.pi, 0.0, math.pi])
 
-# Amplitudes tuned to produce a visible but conservative stride.
-# Coxa swings the leg forward/back, femur lifts, tibia follows.
-_AMP_COXA  = 0.25  # rad
-_AMP_FEMUR = 0.20
-_AMP_TIBIA = 0.30
-
-
-# Four legs, diagonal pairs offset by pi so legs 0/1 and 2/3 are anti-phase.
-# This directly encodes a trot pattern into the input space.
-_LEG_PHASE_OFFSETS = torch.tensor([0.0, torch.pi, 0.0, torch.pi])
 
 def gait_phase_clock(
   env: ManagerBasedRlEnv,
-  frequency: float = 1.5,  # Hz, roughly one stride per second
+  frequency: float = 1.5,
 ) -> torch.Tensor:
-  # Advance a per-env phase counter lazily
+  # Initialize lazily
   if not hasattr(env, "_phase_clock"):
     env._phase_clock = torch.zeros(env.num_envs, device=env.device)
 
-  # Reset on new episode
   env._phase_clock[env.episode_length_buf <= 1] = 0.0
 
-  dt = env.physics_dt * env.cfg.decimation  # policy dt
-  env._phase_clock += 2.0 * torch.pi * frequency * dt
+  dt = env.physics_dt * env.cfg.decimation
+  env._phase_clock += 2.0 * math.pi * frequency * dt
 
-  # [B, 4] per-leg phases: diagonal pair offset by pi
   offsets = _LEG_PHASE_OFFSETS.to(env.device)
-  phases = env._phase_clock.unsqueeze(1) + offsets.unsqueeze(0)  # [B, 4]
+  phases = env._phase_clock.unsqueeze(1) + offsets  # [B, 4]
 
-  # sin and cos together encode both phase and rate without discontinuity
+  # Sin and cos together give a smooth, non-discontinuous phase signal.
+  # The policy sees both where in the cycle each leg is AND the rate of change.
   return torch.cat([torch.sin(phases), torch.cos(phases)], dim=1)  # [B, 8]
 
 
-def gait_residual(
-  env: ManagerBasedRlEnv,
-) -> torch.Tensor:
-  """
-  Returns a [B, 12] reference joint trajectory for a trot gait.
-  Used as the action mean so the policy outputs residuals on top of it.
-  Requires _phase_clock to already exist (created by gait_phase_clock obs).
-  """
-
-  if not hasattr(env, "_phase_clock"):
-    return torch.zeros(env.num_envs, 12, device=env.device)
-
-  offsets = _LEG_PHASE_OFFSETS.to(env.device)
-  phases = env._phase_clock.unsqueeze(1) + offsets.unsqueeze(0)  # [B, 4]
-
-  coxa  = _AMP_COXA  * torch.sin(phases)           # [B, 4]
-  femur = _AMP_FEMUR * torch.sin(phases + math.pi / 2)
-  tibia = _AMP_TIBIA * torch.sin(phases + math.pi)
-
-  # Interleave: [coxa_1, femur_1, tibia_1, coxa_2, ...]
-  ref = torch.stack([coxa, femur, tibia], dim=2).reshape(env.num_envs, 12)  # [B, 12]
-  return ref
-
-
-actor_proprioceptive_terms = {
+# Actor: sim-to-real-safe sensors only, with noise.
+actor_terms = {
   "base_lin_vel": ObservationTermCfg(
     func=builtin_sensor,
     params={"sensor_name": "imu_lin_vel"},
     noise=Unoise(n_min=-0.5, n_max=0.5),
-    history_length=_PROPRIOCEPTIVE_HISTORY,
+    history_length=_HISTORY,
   ),
   "base_ang_vel": ObservationTermCfg(
     func=builtin_sensor,
     params={"sensor_name": "imu_ang_vel"},
     noise=Unoise(n_min=-0.2, n_max=0.2),
-    history_length=_PROPRIOCEPTIVE_HISTORY,
+    history_length=_HISTORY,
   ),
-  # No history: gravity vector changes only when the robot tips, which is a
-  # slow signal; a single frame is sufficient
+  # Gravity projection: slow signal, single frame is sufficient
   "projected_gravity": ObservationTermCfg(
     func=projected_gravity,
     noise=Unoise(n_min=-0.05, n_max=0.05),
   ),
-  # Having joint positions across frames encode leg phase implicitly:
-  # the policy can infer whether each leg is mid-swing or mid-stance without
-  # a separate phase signal
+  # Joint history implicitly encodes leg phase
   "joint_pos": ObservationTermCfg(
     func=joint_pos_rel,
     noise=Unoise(n_min=-0.01, n_max=0.01),
-    history_length=_PROPRIOCEPTIVE_HISTORY,
+    history_length=_HISTORY,
   ),
   "joint_vel": ObservationTermCfg(
     func=joint_vel_rel,
     noise=Unoise(n_min=-1.5, n_max=1.5),
-    history_length=_PROPRIOCEPTIVE_HISTORY,
+    history_length=_HISTORY,
   ),
-  # Past actions let the policy detect its own oscillation pattern
-  # and self-correct without needing an explicit oscillation penalty
+  # Action history lets the policy detect and correct its own oscillations
   "actions": ObservationTermCfg(
     func=last_action,
-    history_length=_PROPRIOCEPTIVE_HISTORY,
+    history_length=_HISTORY,
   ),
-  # No history: command is constant within a resampling window, stacking it`
-  # would just repeat the same vector n times and waste input dimensions
+  # Command is constant within a resampling window — no history needed
   "command": ObservationTermCfg(
     func=generated_commands,
     params={"command_name": "twist"},
   ),
-  # Tells the policy when to move
+  # Absolute phase reference the policy cannot infer from proprioception.
+  # Joint positions tell the policy where the legs are; the clock tells it
+  # where they should be going. No history: it is already a temporal signal.
   "gait_phase": ObservationTermCfg(
     func=gait_phase_clock,
     params={"frequency": 1.5},
   ),
-  # Tells the policy how much to move
-  "gait_residual": ObservationTermCfg(
-    func=gait_residual,
-  ),
-}
-
-actor_exteroceptive_terms = {
-  # No history: terrain geometry changes slowly relative to the stride cycle;
-  # the scan is also the largest term (many grid points), stacking it would
-  # inflate the input dimension significantly with no benefit
+  # Terrain: slow signal, no history to avoid inflating input size
   "height_scan": ObservationTermCfg(
     func=height_scan,
     params={"sensor_name": "terrain_scan"},
@@ -162,21 +117,13 @@ actor_exteroceptive_terms = {
   ),
 }
 
-actor_terms = {
-  **actor_proprioceptive_terms,
-  **actor_exteroceptive_terms
-}
-
-# Critic takes all the terms of the actor + observations from environment e.g. foot height, ...
-# Clean ground truth versions of the noisy actor terms. No history needed
-# since the critic sees exact state and doesn't need to infer trends
-
+# Critic: everything the actor sees + clean ground truth + privileged contact info.
+# No noise, no history needed since the critic sees exact state.
 critic_terms = {
   **actor_terms,
   "true_base_lin_vel": ObservationTermCfg(
     func=builtin_sensor,
     params={"sensor_name": "imu_lin_vel"},
-    # Critic sees clean signal
   ),
   "true_base_ang_vel": ObservationTermCfg(
     func=builtin_sensor,
@@ -188,22 +135,22 @@ critic_terms = {
   "true_joint_vel": ObservationTermCfg(
     func=joint_vel_rel,
   ),
-  "height_scan": ObservationTermCfg(
+  "true_height_scan": ObservationTermCfg(
     func=height_scan,
     params={"sensor_name": "terrain_scan"},
     scale=1 / TERRAIN_SCAN.max_distance,
   ),
   "feet_contact": ObservationTermCfg(
-      func=foot_contact,
-      params={"sensor_name": "feet_ground_contact"},
+    func=foot_contact,
+    params={"sensor_name": "feet_ground_contact"},
   ),
   "feet_air_time": ObservationTermCfg(
-      func=foot_air_time,
-      params={"sensor_name": "feet_ground_contact"},
+    func=foot_air_time,
+    params={"sensor_name": "feet_ground_contact"},
   ),
   "feet_contact_forces": ObservationTermCfg(
-      func=foot_contact_forces,
-      params={"sensor_name": "feet_ground_contact"},
+    func=foot_contact_forces,
+    params={"sensor_name": "feet_ground_contact"},
   ),
   "feet_height": ObservationTermCfg(
     func=foot_height,

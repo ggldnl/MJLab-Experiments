@@ -12,75 +12,73 @@ the gradient competition.
 import math
 import torch
 
-from mjlab.envs.mdp import (
-  action_rate_l2,
-  joint_vel_l2,
-)
+from mjlab.envs.mdp import action_rate_l2, joint_vel_l2
 from mjlab.managers import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.tasks.velocity.mdp import (
-  feet_air_time,
   feet_slip,
+  is_terminated,
   self_collision_cost,
   track_angular_velocity,
   track_linear_velocity,
-  is_terminated,
 )
 from mjlab.envs import ManagerBasedRlEnv
 from mjlab.utils.lab_api.math import quat_apply_inverse
 
-from experiments.robots.crawler.constants import CRAWLER_BASE_NAME, CRAWLER_FOOT_SITE_NAMES, CRAWLER_LEG_DIAGONAL_PAIRS
+from experiments.robots.crawler.constants import (
+  CRAWLER_BASE_NAME,
+  CRAWLER_FOOT_SITE_NAMES,
+)
 
 
-_DEFAULT_ASSET_CFG = SceneEntityCfg("robot", joint_names=".*")
+# This is the only coupling between the two files.
+_LEG_PHASE_OFFSETS = torch.tensor([0.0, math.pi, 0.0, math.pi])
 
 
-def trot_stability(
+def phase_contact_reward(
   env: ManagerBasedRlEnv,
   sensor_name: str,
   command_name: str,
   command_threshold: float = 0.05,
-  mode: str = "two_legs"
 ) -> torch.Tensor:
   """
-  Reward trot stability. Two modes can be used to ensure stability:
-  - diagonal leg pairs being in the same contact phase (both grounded or both airborne) results
-    in a highly dynamic gait which is often unfeasible in reality
-  - only one leg at a time could swing, the other three stay on the ground and propel the
-    body forward
+  Reward contact state matching the trot clock.
+  When cos(phase) > 0 the leg should be in stance; when cos(phase) < 0 it
+  should be in swing. Agreement is 1.0 when all four legs match the schedule,
+  0.25 when only one matches (e.g. body-rocking with three static feet).
+  This directly breaks the standing-still local minimum without any penalty.
+  Gated on command magnitude so the robot is not forced to trot in place
+  when commanded to stand.
   """
 
-  sensor = env.scene.sensors[sensor_name]
-  found = sensor.data.found.reshape(env.num_envs, -1).float()  # [B, num_feet]
+  # _phase_clock is initialised by gait_phase_clock in observations.py,
+  # which always runs before rewards in the RL loop.
+  if not hasattr(env, "_phase_clock"):
+    return torch.zeros(env.num_envs, device=env.device)
 
-  reward = torch.zeros(env.num_envs, device=env.device)
-  if mode == "two_legs":
-    for i, j in CRAWLER_LEG_DIAGONAL_PAIRS:
-      # 1.0 when both grounded or both airborne, 0.0 when mismatched
-      same_phase = 1.0 - torch.abs(found[:, i] - found[:, j])
-      reward += same_phase
-    reward /= len(CRAWLER_LEG_DIAGONAL_PAIRS)  # normalize to [0, 1]
-  elif mode == "three_legs":
-    num_grounded = torch.sum(found, dim=1)
-    reward = 1.0 - torch.abs(num_grounded - 3.0) / 3.0
-    reward = torch.clamp(reward, min=0.0)
+  offsets = _LEG_PHASE_OFFSETS.to(env.device)
+  phases = env._phase_clock.unsqueeze(1) + offsets  # [B, 4]
+
+  # Stance when cos > 0, swing when cos < 0
+  desired_contact = (torch.cos(phases) > 0).float()  # [B, 4]
+
+  sensor = env.scene.sensors[sensor_name]
+  actual_contact = sensor.data.found.reshape(env.num_envs, -1).float()  # [B, 4]
+
+  agreement = 1.0 - torch.abs(desired_contact - actual_contact).mean(dim=1)  # [B]
 
   command = env.command_manager.get_command(command_name)
   total_command = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
   scale = (total_command > command_threshold).float()
 
-  return reward * scale
+  return agreement * scale
 
 
-def flat_orientation(
-  env: ManagerBasedRlEnv,
-  std: float,
-) -> torch.Tensor:
+def flat_orientation(env: ManagerBasedRlEnv, std: float) -> torch.Tensor:
   """
-  Reward flat base orientation (robot being upright) measuring the robot's current tilt angle.
-  It projects gravity into the body frame: if the robot is perfectly upright, gravity points
-  straight down in body frame and the x/y components are zero. If the robot is tilted, those
-  components grow. It's a position-domain signal.
+  Reward upright base orientation.
+  Projects gravity into the body frame: zero x/y components = perfectly upright.
+  Returns values in (0, 1]: 1.0 when flat, decaying with tilt.
   """
 
   asset = env.scene["robot"]
@@ -94,15 +92,11 @@ def flat_orientation(
 
   return torch.exp(-xy_squared / std**2)
 
-def base_height(
-  env: ManagerBasedRlEnv,
-  target_height: float,
-  std: float
-) -> torch.Tensor:
+
+def base_height(env: ManagerBasedRlEnv, target_height: float, std: float) -> torch.Tensor:
   """
   Reward staying close to a target base height.
-  Uses a Gaussian kernel so small deviations are tolerated but large ones are penalized.
-  Adjust target_height to match your robot's nominal standing height.
+  Returns values in (0, 1]: 1.0 at target, decaying with distance.
   """
 
   asset = env.scene["robot"]
@@ -113,192 +107,90 @@ def base_height(
 
   return torch.exp(-height_error_sq / std ** 2)
 
-def stand_still(
-  env: ManagerBasedRlEnv,
-  command_name: str,
-  command_threshold: float = 0.05,
-  std: float = 0.05,            # meters, not rad/s — tighter now
-  window_steps: int = 20,       # ~0.2s rolling window
-) -> torch.Tensor:
-  # Lazily init short-window anchor for reward
-  if not hasattr(env, "_stand_still_anchor"):
-    asset = env.scene["robot"]
-    env._stand_still_anchor = asset.data.root_link_pos_w[:, :2].clone()
-    env._stand_still_anchor_step = torch.zeros(
-      env.num_envs, dtype=torch.long, device=env.device
-    )
+
+def base_stability(env: ManagerBasedRlEnv, std: float = 0.5) -> torch.Tensor:
+  """
+  Penalize roll and pitch angular velocity.
+  Returns values in (0, 1]: 1.0 when still, decaying with wobble.
+  Use with a negative curriculum weight so wobble is penalized.
+  """
 
   asset = env.scene["robot"]
-  current_pos = asset.data.root_link_pos_w[:, :2]
-  current_step = env.episode_length_buf
-
-  new_episode = current_step <= 1
-  env._stand_still_anchor[new_episode] = current_pos[new_episode]
-  env._stand_still_anchor_step[new_episode] = 0
-
-  refresh = (current_step - env._stand_still_anchor_step) >= window_steps
-  env._stand_still_anchor[refresh] = current_pos[refresh]
-  env._stand_still_anchor_step[refresh] = current_step[refresh]
-
-  net_displacement = torch.norm(current_pos - env._stand_still_anchor, dim=1)
-  stillness = torch.exp(-net_displacement / std)  # near 1.0 when not actually moving
-
-  command = env.command_manager.get_command(command_name)
-  total_command = torch.norm(command[:, :2], dim=1) + torch.abs(command[:, 2])
-  scale = (total_command > command_threshold).float()
-
-  return stillness * scale
+  roll_pitch_vel = asset.data.root_link_vel_w[:, 3:5]  # [B, 2]
+  wobble_sq = torch.sum(roll_pitch_vel ** 2, dim=1)
+  return torch.exp(-wobble_sq / std ** 2)
 
 
 def nonfeet_ground_contact(
   env: ManagerBasedRlEnv,
   sensor_name: str = "nonfeet_ground_contact",
 ) -> torch.Tensor:
-  """
-  Penalize any contact between non-foot geoms and the terrain.
-  """
-
+  """Penalize any non-foot body part touching the terrain."""
   sensor = env.scene.sensors[sensor_name]
-  found = sensor.data.found.reshape(env.num_envs, -1)  # [B, N]
+  found = sensor.data.found.reshape(env.num_envs, -1)
   return found.float().sum(dim=1)
-
-
-def base_stability(
-  env: ManagerBasedRlEnv,
-  std: float = 0.5,
-) -> torch.Tensor:
-  """
-  Penalize roll and pitch angular velocity of the base during locomotion.
-  This targets dynamic wobble and tilting while walking, which the static
-  orientation term (posture) cannot capture: a robot can be momentarily
-  upright but still oscillating heavily.
-  Uses a Gaussian so small wobble is tolerated and only large rates are
-  penalized strongly.
-  It's a velocity-domain signal.
-  """
-
-  asset = env.scene["robot"]
-
-  # root_link_vel_w is [B, 6]: [:3] linear, [3:] angular in world frame
-  # indices 3 and 4 are roll rate and pitch rate respectively
-  roll_pitch_vel = asset.data.root_link_vel_w[:, 3:5]  # [B, 2]
-  wobble_sq = torch.sum(roll_pitch_vel ** 2, dim=1)  # [B]
-
-  return torch.exp(-wobble_sq / std**2)  # 1.0 when still, 0.0 at large wobble
 
 
 rewards = {
 
-  # Positive signals: define what the robot should do
+  # --- Core terms (active from step 0, never disabled) ---
 
-  # Phase 1: robot must learn to move and explore different strategies
-
-  # Primary task: velocity tracking.
-  # Weights are high and stay high throughout training.
-  # std=0.25 m/s for linear: at command=0.1 m/s a stationary robot gets
-  # exp(-0.04/0.0625)=0.53, giving a meaningful gradient toward motion.
-  # std=0.2 rad/s for angular: same reasoning.
+  # Primary task. std=0.25 m/s gives meaningful gradient even at low speeds.
   "track_linear_velocity": RewardTermCfg(
     func=track_linear_velocity,
     weight=5.0,
-    params={
-      "command_name": "twist",
-      "std": 0.25,
-    },
-  ),
-  "track_angular_velocity": RewardTermCfg(
-    func=track_angular_velocity,
-    weight=3.0,  # lower than linear, yaw is secondary
-    params={
-      "command_name": "twist",
-      "std": 0.25,
-    },
+    params={"command_name": "twist", "std": 0.25},
   ),
 
-  # Penalizes non-foot body parts touching the terrain.
-  "nonfeet_ground_contact": RewardTermCfg(
-    func=nonfeet_ground_contact,
-    weight=0.0,  # curriculum
-    params={
-      "sensor_name": "nonfeet_ground_contact",
-    },
-  ),
-
-  # Discourages standing still when commanded to move.
-  "stand_still": RewardTermCfg(
-    func=stand_still,
-    weight=0.0,  # curriculum
-    params={
-      "command_name": "twist",
-      "command_threshold": 0.05,
-      "std": 0.2,
-    },
-  ),
-
-  # With positive weight, incentivizes foot lifting, exactly what we want during gait
-  "air_time": RewardTermCfg(
-    func=feet_air_time,
-    weight=0.5,
+  # Structural fix for the standing-still local minimum.
+  # Agreement score breaks the body-rocking + single-leg exploit directly:
+  # three static feet will never score above 0.25 on this term.
+  "phase_contact": RewardTermCfg(
+    func=phase_contact_reward,
+    weight=2.0,
     params={
       "sensor_name": "feet_ground_contact",
-      "threshold_min": 0.05,
-      "threshold_max": 0.3,
       "command_name": "twist",
-      "command_threshold": 0.05,
     },
   ),
 
-  # Hard termination penalty.
+  # Hard constraint. Large enough that no combination of other terms justifies dying.
   "is_terminated": RewardTermCfg(
     func=is_terminated,
     weight=-200.0,
   ),
 
-  # Everything else starts from 0 and gets enabled by the curriculum
-  # Phase 1: Robot must move (only velocity + termination active)
-  # Phase 2: Robot must move well (gait quality added)
-  # Phase 3: Robot must move well and look good (posture added)
-  # Phase 4: Robot must move well, look good, and be efficient (smoothness added)
+  # Tiny smoothness floor: prevents high-frequency noise, does not suppress exploration.
+  "action_rate_l2": RewardTermCfg(
+    func=action_rate_l2,
+    weight=-0.02,
+  ),
 
-  # Posture: upright orientation.
-  # std=0.5 rad (~28 deg): tolerates normal walking lean.
-  # Weight starts at 0, introduced by curriculum once the robot walks.
+  # --- Phase 2: behavioural constraints (curriculum) ---
+
+  "nonfeet_ground_contact": RewardTermCfg(
+    func=nonfeet_ground_contact,
+    weight=0.0,
+    params={"sensor_name": "nonfeet_ground_contact"},
+  ),
+
+  # --- Phase 3: posture (curriculum) ---
+
   "upright": RewardTermCfg(
     func=flat_orientation,
-    weight=0.0,  # curriculum
-    params={
-      "std": 0.5,
-    },
+    weight=0.0,
+    params={"std": 0.5},
   ),
 
-  # Posture: base height.
-  # std=0.025 m (25 mm): tolerates terrain bounce, penalizes collapse.
-  # Weight starts at 0, introduced by curriculum once the robot walks.
   "base_height": RewardTermCfg(
     func=base_height,
-    weight=0.0,  # curriculum
-    params={
-      "target_height": 0.035,  # 3/4 cm from the ground
-      "std": 0.025,
-    },
-  ),
-
-  # Posture: dynamic base stability (roll/pitch rate).
-  # std=0.5 rad/s: tolerates smooth gait, penalizes stumbling.
-  # Weight starts at 0, introduced by curriculum after posture is established.
-  # This is a velocity-domain signal and only penalizes dynamical wobbling.
-  "base_stability": RewardTermCfg(
-    func=base_stability,  # curriculum
     weight=0.0,
-    params={
-      "std": 0.5,  # tolerates ~0.5 rad/s roll/pitch rate before significant penalty
-    },
+    params={"target_height": 0.035, "std": 0.025},
   ),
 
-  # Penalizes foot sliding.
   "foot_slip": RewardTermCfg(
     func=feet_slip,
-    weight=0.0,  # curriculum
+    weight=0.0,
     params={
       "sensor_name": "feet_ground_contact",
       "command_name": "twist",
@@ -307,49 +199,22 @@ rewards = {
     },
   ),
 
-  # Discourages jerky joint commands.
-  "action_rate_l2": RewardTermCfg(
-    func=action_rate_l2,
-    weight=-0.05,  # curriculum
+  # --- Phase 4: polish (curriculum) ---
+
+  "base_stability": RewardTermCfg(
+    func=base_stability,
+    weight=0.0,
+    params={"std": 0.5},
   ),
 
-  # Penalize fast joint motion. Weight must be small enough that walking-speed
-  # joint velocities don't swamp the positive tracking signal.
-  # At 12 joints with typical walking vel ~2 rad/s each, raw L2 ~ 12*(2²) = 48.
-  # At -0.1 that's already -4.8 per step, which over an episode completely
-  # dominates the +4.0 tracking reward. For this reason we keep this term
-  # very small compared to others.
   "joint_vel_l2": RewardTermCfg(
     func=joint_vel_l2,
-    weight=0.0,  # curriculum
+    weight=0.0,
   ),
 
-  # Penalizes self-collision.
   "self_collisions": RewardTermCfg(
     func=self_collision_cost,
-    weight=-1.0,
-    params={
-      "sensor_name": "self_collision",
-      "force_threshold": 2.5,
-    },
+    weight=0.0,
+    params={"sensor_name": "self_collision", "force_threshold": 2.5},
   ),
 }
-
-"""
-# Rationale for std values:
-# Running values are ~1.5-2x walking values to accommodate larger motion range.
-# Patterns use (?i) for case-insensitive matching.
-rewards["pose"].params["std_standing"] = {
-  ".*": 0.05
-}
-rewards["pose"].params["std_walking"] = {
-  r"(?i).*_coxa$": 0.15,   # tighter
-  r"(?i).*_femur$": 0.35,  # looser
-  r"(?i).*_tibia$": 0.4,   # largest variation
-}
-rewards["pose"].params["std_running"] = {
-  r"(?i).*_coxa$": 0.25,
-  r"(?i).*_femur$": 0.6,
-  r"(?i).*_tibia$": 0.7,
-}
-"""
